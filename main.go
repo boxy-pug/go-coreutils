@@ -14,13 +14,18 @@ type Config struct {
 	list         []string
 	unique       bool
 	stdLibSorted []string
+	bubbleSort   bool
 }
 
 func main() {
 
 	cfg := loadConfig()
 
-	cfg.stdLibSort()
+	if cfg.bubbleSort {
+		cfg.bubbleSortList()
+	} else {
+		cfg.stdLibSort()
+	}
 
 	cfg.print()
 
@@ -32,6 +37,7 @@ func loadConfig() Config {
 	lineSet := make(map[string]struct{})
 
 	flag.BoolVar(&cfg.unique, "u", false, "only output unique lines")
+	flag.BoolVar(&cfg.bubbleSort, "bubble-sort", false, "use bubble sort")
 	flag.Parse()
 	args := flag.Args()
 
@@ -72,4 +78,23 @@ func (cfg *Config) print() {
 	for _, line := range cfg.list {
 		fmt.Println(line)
 	}
+}
+
+func (cfg *Config) bubbleSortList() {
+	swapping := true
+	end := len(cfg.list)
+
+	for swapping {
+		swapping = false
+		for i := 1; i < end; i++ {
+			if cfg.list[i-1] > cfg.list[i] {
+				cfg.list[i-1], cfg.list[i] = cfg.list[i], cfg.list[i-1]
+				swapping = true
+			}
+
+		}
+		fmt.Println(cfg.list)
+	}
+
+	end--
 }
