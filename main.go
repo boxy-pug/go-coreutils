@@ -5,29 +5,56 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"slices"
-	"strings"
+	"time"
+
+	"github.com/boxy-pug/ccsort/sortalgos"
 )
 
 type Config struct {
-	file         *os.File
-	list         []string
-	unique       bool
-	stdLibSorted []string
-	bubbleSort   bool
+	file   *os.File
+	list   []string
+	unique bool
+	//stdLibSorted []string
+	bubbleSort    bool
+	verbose       bool
+	mergeSort     bool
+	insertionSort bool
+	quickSort     bool
 }
 
 func main() {
+	var start time.Time
+	var duration time.Duration
 
 	cfg := loadConfig()
 
-	if cfg.bubbleSort {
-		cfg.bubbleSortList()
-	} else {
-		cfg.stdLibSort()
+	if cfg.verbose {
+		start = time.Now()
 	}
 
-	cfg.print()
+	if cfg.bubbleSort {
+		cfg.list = sortalgos.Bubble(cfg.list)
+	} else if cfg.mergeSort {
+		cfg.list = sortalgos.MergeSort(cfg.list)
+	} else if cfg.insertionSort {
+		cfg.list = sortalgos.InsertionSort(cfg.list)
+	} else if cfg.quickSort {
+		low := 0
+		high := len(cfg.list) - 1
+		sortalgos.QuickSort(cfg.list, low, high)
+	} else {
+		cfg.list = sortalgos.StdLib(cfg.list)
+	}
+
+	if cfg.verbose {
+		duration = time.Since(start)
+	}
+
+	printLines(cfg.list)
+
+	if cfg.verbose {
+		fmt.Printf("Sorting %s took %v\n", cfg.file.Name(), duration)
+	}
 
 }
 
@@ -37,7 +64,11 @@ func loadConfig() Config {
 	lineSet := make(map[string]struct{})
 
 	flag.BoolVar(&cfg.unique, "u", false, "only output unique lines")
-	flag.BoolVar(&cfg.bubbleSort, "bubble-sort", false, "use bubble sort")
+	flag.BoolVar(&cfg.verbose, "v", false, "verbose mode")
+	flag.BoolVar(&cfg.bubbleSort, "bubble", false, "use bubble sort")
+	flag.BoolVar(&cfg.mergeSort, "merge", false, "merge sort")
+	flag.BoolVar(&cfg.insertionSort, "insertion", false, "insertion sort")
+	flag.BoolVar(&cfg.quickSort, "quick", false, "quick sort")
 	flag.Parse()
 	args := flag.Args()
 
@@ -68,33 +99,8 @@ func loadConfig() Config {
 	return cfg
 }
 
-func (cfg *Config) stdLibSort() {
-	slices.SortFunc(cfg.list, func(a, b string) int {
-		return strings.Compare(a, b)
-	})
-}
-
-func (cfg *Config) print() {
-	for _, line := range cfg.list {
+func printLines(list []string) {
+	for _, line := range list {
 		fmt.Println(line)
 	}
-}
-
-func (cfg *Config) bubbleSortList() {
-	swapping := true
-	end := len(cfg.list)
-
-	for swapping {
-		swapping = false
-		for i := 1; i < end; i++ {
-			if cfg.list[i-1] > cfg.list[i] {
-				cfg.list[i-1], cfg.list[i] = cfg.list[i], cfg.list[i-1]
-				swapping = true
-			}
-
-		}
-		fmt.Println(cfg.list)
-	}
-
-	end--
 }
