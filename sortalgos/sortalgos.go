@@ -13,6 +13,7 @@ var SortFunctions = map[config.SortingAlgo]func([]string){
 	config.Merge:     Merge,
 	config.Insertion: InsertionSort,
 	config.Quick:     QuickSortHelper,
+	config.Selection: Selection,
 }
 
 func StdLib(list []string) {
@@ -117,4 +118,16 @@ func partition(list []string, low, high int) int {
 	}
 	list[i+1], list[high] = list[high], list[i+1]
 	return i + 1
+}
+
+func Selection(list []string) {
+	for i := range list {
+		min_idx := i
+		for j := i + 1; j < len(list); j++ {
+			if list[j] < list[min_idx] {
+				min_idx = j
+			}
+		}
+		list[i], list[min_idx] = list[min_idx], list[i]
+	}
 }

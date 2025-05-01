@@ -16,6 +16,7 @@ const (
 	Merge     SortingAlgo = "merge"
 	Insertion SortingAlgo = "insertion"
 	Quick     SortingAlgo = "quick"
+	Selection SortingAlgo = "selection"
 )
 
 type Config struct {
@@ -23,6 +24,7 @@ type Config struct {
 	List        []string
 	Unique      bool
 	Verbose     bool
+	Test        bool
 	SortingAlgo SortingAlgo
 }
 
@@ -34,7 +36,8 @@ func LoadConfig() Config {
 
 	flag.BoolVar(&cfg.Unique, "u", false, "only output unique lines")
 	flag.BoolVar(&cfg.Verbose, "v", false, "verbose mode")
-	flag.StringVar(&algo, "algo", "stdlib", "choose sorting algo: stdlib, bubble, merge, insertion, quick")
+	flag.BoolVar(&cfg.Test, "test", false, "test all algos")
+	flag.StringVar(&algo, "algo", "stdlib", "choose sorting algo: stdlib, bubble, merge, insertion, quick, selection")
 
 	flag.Parse()
 	args := flag.Args()
@@ -85,6 +88,8 @@ func parseAlgo(str string) SortingAlgo {
 		return Insertion
 	case "quick":
 		return Quick
+	case "selection":
+		return Selection
 	default:
 		return StdLib
 	}
