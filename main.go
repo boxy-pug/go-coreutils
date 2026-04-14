@@ -119,11 +119,9 @@ func printHeadLines(r io.Reader, w io.Writer, n int) error {
 
 	for range n {
 		line, err := reader.ReadBytes('\n')
-
 		if len(line) > 0 {
 			w.Write(line)
 		}
-
 		if err == io.EOF {
 			break
 		}
