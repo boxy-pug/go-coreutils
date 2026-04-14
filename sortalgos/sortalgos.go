@@ -120,14 +120,24 @@ func partition(list []string, low, high int) int {
 	return i + 1
 }
 
+// Selection sort iterates through the slice, finds the minimum element in the unsorted portion,
+// and swaps it with the first element of the unsorted portion.
 func Selection(list []string) {
+	// Outer loop: iterates through each element of the slice
 	for i := range list {
+		// Assume the current index is the minimum
 		min_idx := i
+
+		// Inner loop: finds the actual minimum element in the unsorted portion
 		for j := i + 1; j < len(list); j++ {
+			// Compare the current element with the assumed minimum
 			if list[j] < list[min_idx] {
+				// Update the minimum index if a smaller element is found
 				min_idx = j
 			}
 		}
+
+		// Swap the found minimum element with the first element of the unsorted portion
 		list[i], list[min_idx] = list[min_idx], list[i]
 	}
 }
