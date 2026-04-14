@@ -231,6 +231,7 @@ func TestProcessLines(t *testing.T) {
 
 		assertEqual(t, got, want)
 	})
+
 	t.Run("delete class spec", func(t *testing.T) {
 		var buf bytes.Buffer
 		cfg := config{
@@ -248,6 +249,24 @@ func TestProcessLines(t *testing.T) {
 
 		assertEqual(t, got, want)
 	})
+	/*
+		t.Run("squeeze", func(t *testing.T) {
+			var buf bytes.Buffer
+			cfg := config{
+				input:       strings.NewReader("hello...oo"),
+				target:      []rune("l."),
+				squeezeFlag: true,
+				output:      &buf,
+			}
+
+			cfg.translateCmd()
+
+			got := buf.String()
+			want := "helo.oo"
+
+			assertEqual(t, got, want)
+		})
+	*/
 	/*
 		t.Run("class specifier target and regular translation", func(t *testing.T) {
 			var buf bytes.Buffer

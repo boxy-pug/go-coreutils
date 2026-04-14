@@ -16,6 +16,7 @@ type config struct {
 	input            io.Reader
 	subst            map[rune]rune
 	deleteFlag       bool
+	squeezeFlag      bool
 	target           []rune
 	translation      []rune
 	targetType       expressionType
@@ -85,12 +86,13 @@ func loadConfig() (config, error) {
 	}
 
 	flag.BoolVar(&cfg.deleteFlag, "d", false, "delete chosen chars")
+	flag.BoolVar(&cfg.squeezeFlag, "s", false, "squeeze chosen chars")
 
 	flag.Parse()
 	args := flag.Args()
 
 	switch {
-	case len(args) == 1 && cfg.deleteFlag:
+	case len(args) == 1 && (cfg.deleteFlag || cfg.squeezeFlag):
 		cfg.target = []rune(args[0])
 	case len(args) < 2:
 		return cfg, fmt.Errorf("please provide chars to translate and chars to translate into: %v", args)
@@ -144,10 +146,18 @@ func (cfg *config) processRunes(line string) string {
 	scanner := bufio.NewScanner(strings.NewReader(line))
 	scanner.Split(bufio.ScanRunes)
 
+	// squeezeMap := make(map[rune]struct{})
 	var res strings.Builder
 
 	for scanner.Scan() {
 		currentRune := []rune(scanner.Text())[0]
+
+		// if cfg.squeezeFlag {
+		// _, exists := squeezeMap[currentRune]
+		// if exists {
+		// continue
+		// }
+		// }
 
 		// check cache first
 		cachedRune, exists := cfg.subst[currentRune]
@@ -156,13 +166,18 @@ func (cfg *config) processRunes(line string) string {
 				continue
 			}
 			res.WriteRune(cachedRune)
+			// if cfg.squeezeFlag {
+			// squeezeMap[currentRune] = struct{}{}
+			// }
 		} else {
 			processedRune := cfg.substitute(currentRune)
 			if processedRune != 0 {
 				res.WriteRune(processedRune)
+				// if cfg.squeezeFlag && processedRune != currentRune {
+				// squeezeMap[currentRune] = struct{}{}
+				// }
 			}
 		}
-
 	}
 	return res.String()
 }
