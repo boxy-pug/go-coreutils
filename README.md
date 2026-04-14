@@ -1,5 +1,4 @@
 # 📝 ccwc
-
 A Go implementation of the classic Unix `wc` (word count) tool, created for the [codingchallenges.fyi wc challenge](https://codingchallenges.fyi/challenges/challenge-wc/).
 
 ---
@@ -9,8 +8,7 @@ A Go implementation of the classic Unix `wc` (word count) tool, created for the 
 -  Counts **lines**, **words**, **bytes**, and **characters** (Unicode-aware)
 -  Supports **multiple files** and **stdin**
 -  Output style matches GNU `wc`
--  Unit and integration tests included
--  Clean, idiomatic Go code with comments
+-  Unit and integration tests
 
 ---
 
@@ -67,7 +65,7 @@ $ ccwc -l -w -c test.txt
 
 -  **`io.Reader`** is great for reading from many different sources, including `os.Stdin` and `os.File`.
 
--  When opening files in a function, return a cleanup function to close the files, and use `defer` in `main` to execute it.
+-  When opening files in a function, return a cleanup function to close the files, and use `defer` in `main` or parent func to execute it.
 
 -  Ranging over values in Go creates copies; to modify originals, access them by index.
 
