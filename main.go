@@ -12,8 +12,9 @@ import (
 )
 
 type Config struct {
-	substitution  Substitution
-	file          *os.File
+	substitution Substitution
+	file         *os.File
+	// fileName      string
 	printSelected bool
 	editInPlace   bool
 	onlyRange     bool
@@ -39,7 +40,7 @@ func main() {
 
 	substituteReader(cfg)
 
-	//substitute(cfg)
+	// substitute(cfg)
 
 }
 
@@ -50,7 +51,7 @@ func loadConfig() Config {
 	// output a range of lines from the file. specify a range, i.e.
 	// for lines 2 to 4 we would use the command: cat -n ccsed -n '2,4p’ filename
 	flag.BoolVar(&cfg.printSelected, "n", false, "only print selected")
-	//flag.BoolVar(&cfg.doubleSpacing, "G", false, "double spacing a file")
+	// flag.BoolVar(&cfg.doubleSpacing, "G", false, "double spacing a file")
 	flag.BoolVar(&cfg.editInPlace, "i", false, "edit in place")
 
 	flag.Parse()
@@ -92,15 +93,20 @@ func parseSubstitution(subst string, cfg Config) (Substitution, error) {
 	defaultSubst := "s///g"
 	var res Substitution
 	var err error
+	var pattern bool
 	var substList []string
 
-	// the bufio scanner removes newlines so this doesnt work, should use reader
 	if subst == "G" {
 		subst = "s/\n/\n\n/g"
 	}
 
-	for len(substList) != 4 {
+	for len(substList) < 3 {
 		substList = strings.Split(subst, "/")
+
+		if len(substList) == 3 {
+			pattern = true
+			break
+		}
 		if len(substList) == 4 {
 			break
 		}
@@ -123,14 +129,25 @@ func parseSubstitution(subst string, cfg Config) (Substitution, error) {
 		err = fmt.Errorf("not valid regex pattern: %v", substList[1])
 		return res, err
 	}
-	res.replacement = substList[2]
-	res.flag, err = parseSubstitutionFlag(substList[3])
-	if err != nil {
-		err = fmt.Errorf("invalid substitution flag: %v", substList[3])
-		return res, err
+	if !pattern {
+		res.replacement = substList[2]
+		res.flag, err = parseSubstitutionFlag(substList[3])
+		if err != nil {
+			err = fmt.Errorf("invalid substitution flag: %v", substList[3])
+			return res, err
+		}
+	} else {
+		res.flag, err = parseSubstitutionFlag(substList[2])
+		if err != nil {
+			err = fmt.Errorf("invalid substitution flag: %v", substList[2])
+			return res, err
+		}
+
 	}
 
-	//fmt.Printf("Parsed substitution:\n%v\n%v\n%v\n%v", res.command, res.pattern, res.replacement, res.flag)
+	// if res.flag.delete {}
+
+	// fmt.Printf("Parsed substitution:\n%v\n%v\n%v\n%v\n", res.command, res.pattern, res.replacement, res.flag.delete)
 
 	return res, nil
 }
@@ -150,6 +167,7 @@ func parseSubstitutionFlag(flag string) (SubstFlag, error) {
 	return res, nil
 }
 
+/*
 func substitute(cfg Config) {
 	numLines := 0
 	re := cfg.substitution.pattern
@@ -161,6 +179,7 @@ func substitute(cfg Config) {
 		fmt.Println(re.ReplaceAllString(scanner.Text(), repl))
 	}
 }
+*/
 
 func substituteReader(cfg Config) {
 	numLines := 0
@@ -185,8 +204,14 @@ func substituteReader(cfg Config) {
 			} else {
 				continue
 			}
+		} else if cfg.substitution.flag.print && cfg.printSelected {
+			if re.MatchString(line) {
+				fmt.Print(line)
+			} else {
+				continue
+			}
 		} else {
-			fmt.Printf(re.ReplaceAllString(line, repl))
+			fmt.Print(re.ReplaceAllString(line, repl))
 		}
 	}
 }
