@@ -1,46 +1,32 @@
-# cctail – Tail command clone
+# cctail
 
-This program is a Go implementation of the Unix `tail` command, which prints the last few lines of one or more files. It efficiently handles large files by reading them backwards in chunks.
+A Go clone of the Unix `tail` command. Built independently — not part of a Coding Challenges prompt.
 
-## Features
-
--  **Print Last N Lines**: By default, prints the last 10 lines of each file. You can specify a different number of lines using the `-n` flag.
--  **Multiple Files**: Supports reading from multiple files and prints a header for each file when more than one file is specified.
--  **Standard Input**: Reads from standard input if no files are provided.
+cctail prints the last part of files — by default the last 10 lines. Reads files backwards in chunks to handle large files efficiently.
 
 ## Usage
 
-```bash
-./cctail [options] [file...]
+```sh
+# Print last 10 lines of a file
+cctail test.txt
+
+# Print last N lines
+cctail -n 5 test.txt
+
+# Print last lines from multiple files
+cctail -n 5 file1.txt file2.txt
 ```
 
-### Options
+## Flags
 
--  `-n <number>`: Specify the number of lines to print from the end of each file (default is 10).
+- `-n` — number of lines to print from the end (default: 10)
 
-### Examples
+## Install
 
--  Print the last 10 lines of `file.txt`:
-  ```bash
-  ./cctail file.txt
-  ```
+```sh
+go install github.com/boxy-pug/go-coreutils/cmd/cctail@latest
+```
 
--  Print the last 5 lines of `file1.txt` and `file2.txt`:
-  ```bash
-  ./cctail -n 5 file1.txt file2.txt
-  ```
+## What I learned
 
-## Implementation Details
-
--  **Backward Reading**: The program seeks to the end of each file and reads backwards in chunks, counting newlines until the desired number of lines is found.
--  **Handles Newlines at EOF**: Properly accounts for files that end with a newline, ensuring accurate line counting.
--  **Efficient Chunk Handling**: Uses a buffer to read chunks of data, minimizing memory usage and improving performance.
-
-## License
-
-This project is open source and available under the MIT License.
-
----
-
-This README provides a clear overview of your `tail` command clone, explaining its features, usage, and implementation details.
-
+_(fill me in)_

@@ -1,95 +1,51 @@
-# 📝 ccwc
-A Go implementation of the classic Unix `wc` (word count) tool, created for the [codingchallenges.fyi wc challenge](https://codingchallenges.fyi/challenges/challenge-wc/).
+# ccwc
 
----
+A Go clone of the Unix `wc` (word count) command, built as part of the [Build Your Own wc Tool](https://codingchallenges.fyi/challenges/challenge-wc) challenge.
 
-## 🚀 Features
+ccwc counts lines, words, bytes, and characters in files or from stdin. Unicode-aware character counting via runes.
 
--  Counts **lines**, **words**, **bytes**, and **characters** (Unicode-aware)
--  Supports **multiple files** and **stdin**
--  Output style matches GNU `wc`
--  Unit and integration tests
-
----
-
-## 🛠️ Usage
+## Usage
 
 ```sh
-# Count lines, words, and bytes (default) in one or more files
-ccwc [file1] [file2] ...
+# Default: count lines, words, and bytes
+ccwc test.txt
 
 # Count only lines
-ccwc -l file.txt
+ccwc -l test.txt
 
 # Count only words
-ccwc -w file.txt
+ccwc -w test.txt
 
 # Count only bytes
-ccwc -c file.txt
+ccwc -c test.txt
 
-# Count only characters (Unicode code points)
-ccwc -m file.txt
+# Count characters (Unicode code points)
+ccwc -m test.txt
 
-# Combine flags (order doesn't matter)
-ccwc -l -w -c file.txt
-
-# Use stdin
-cat file.txt | ccwc
+# Read from stdin
+cat test.txt | ccwc -l
 ```
 
----
+## Flags
 
-## 🚩 Flags
+- `-l` — count lines
+- `-w` — count words
+- `-c` — count bytes
+- `-m` — count characters (runes)
 
-| Flag | Description                    |
-|------|--------------------------------|
-| -l   | Count lines                    |
-| -w   | Count words                    |
-| -c   | Count bytes                    |
-| -m   | Count characters (runes)       |
+If no flags are given, ccwc defaults to `-l -w -c`.
 
-*If no flags are given, `ccwc` defaults to `-l -w -c` (lines, words, and bytes).*
-
----
-
-## 💻 Example
+## Install
 
 ```sh
-$ ccwc -l -w -c test.txt
-      10      42     512 test.txt
+go install github.com/boxy-pug/go-coreutils/cmd/ccwc@latest
 ```
 
----
+## What I learned
 
-## 🧠 What I learned
-
--  **`io.Reader`** is great for reading from many different sources, including `os.Stdin` and `os.File`.
-
--  When opening files in a function, return a cleanup function to close the files, and use `defer` in `main` or parent func to execute it.
-
--  Ranging over values in Go creates copies; to modify originals, access them by index.
-
--  Runes represent chars in Go; one emoji or special char is one rune but several bytes: `len([]rune("😊")) == 1` but `len("😊") == 4`. (Unicode, utf8 encoding)
-
--  To provide a custom `--help` or usage message with the `flag` package, redefine `flag.Usage` with a function to print what you want.
-
--  `os.Stderr` is used for error messages and help text (visible even if standard output is redirected).
-
----
-
-## 🧑‍💻 Installation
-
-```sh
-go install github.com/boxy-pug/ccwc@latest
-```
-
-Or clone and build manually:
-
-```sh
-git clone https://github.com/boxy-pug/ccwc.git
-cd ccwc
-go build -o ccwc
-```
-
----
-
+- `io.Reader` is great for reading from many different sources, including `os.Stdin` and `os.File`.
+- When opening files in a function, return a cleanup function to close them, and use `defer` in `main` to execute it.
+- Ranging over values in Go creates copies; to modify originals, access them by index.
+- Runes represent characters in Go; one emoji is one rune but several bytes: `len([]rune("😊")) == 1` but `len("😊") == 4`.
+- To provide a custom `--help` message with the `flag` package, redefine `flag.Usage`.
+- `os.Stderr` is used for error messages and help text — visible even when stdout is redirected.

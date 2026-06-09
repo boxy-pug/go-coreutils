@@ -1,56 +1,37 @@
-# 📚 cchead
+# cchead
 
-cchead is a simple Go implementation of the Unix `head` command, created as part of a coding challenge on [Coding Challenges](https://codingchallenges.fyi/challenges/challenge-head).
+A Go clone of the Unix `head` command, built as part of the [Build Your Own head](https://codingchallenges.fyi/challenges/challenge-head) challenge.
 
----
+cchead prints the first part of files — by default the first 10 lines.
 
-## ✅ Features
-
--  Print a specified number of lines or bytes from the start of files.
--  Supports multiple files, displaying headers for each.
-
----
-
-## 🛠️ Usage
-
--  `-n <number>`: Number of lines to print (default: 10).
--  `-c <number>`: Number of bytes to print.
+## Usage
 
 ```sh
-# Print the first 10 lines of `./testdata/test.txt`:
-  ./cchead -n 10 ./testdata/test.txt
+# Print first 10 lines of a file
+cchead test.txt
 
-# Print the first 100 bytes of `./testdata/test.txt`:
-  ./cchead -c 100 ./testdata/test.txt
+# Print first N lines
+cchead -n 5 test.txt
 
-# Print the first 5 lines of `./testdata/test.txt` and `./testdata/test2.txt`:
-  ./cchead -n 5 ./testdata/test.txt ./testdata/test2.txt
+# Print first N bytes
+cchead -c 100 test.txt
 
+# Print first lines from multiple files
+cchead -n 5 test.txt test2.txt
 ```
 
----
+## Flags
 
-## 🧐 What I learned
+- `-n` — number of lines to print (default: 10)
+- `-c` — number of bytes to print
 
--  **`bufio.Scanner` vs. `bufio.Reader`:** `Scanner` is the simpler version that doesn't retain newlines, which might cause confusion with Windows-style carriage returns `/r/n` and Mac-like newlines `/n`. `Reader` is more advanced, allowing you to read data until a specific delimiter, but you also have to treat the EOF and error cases more carefully.
-
--  For integration testing CLI tools, you can use the `exec package` to compare the actual output of your command to the output of another command – very handy when making a clone.
-
----
-
-## 🧑‍💻 Installation
+## Install
 
 ```sh
-go install github.com/boxy-pug/cchead@latest
+go install github.com/boxy-pug/go-coreutils/cmd/cchead@latest
 ```
 
-Or clone and build manually:
+## What I learned
 
-```sh
-git clone https://github.com/boxy-pug/cchead.git
-cd cchead
-go build -o cchead
-```
-
----
-
+- `bufio.Scanner` vs. `bufio.Reader`: Scanner is simpler but strips newlines, which causes issues with `\r\n` vs `\n`. Reader gives more control but requires careful EOF and error handling.
+- For integration testing CLI tools, use the `exec` package to compare your tool's output to the real command — very handy when building a clone.
