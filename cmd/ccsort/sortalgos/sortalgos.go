@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/boxy-pug/ccsort/config"
+	"github.com/boxy-pug/go-coreutils/cmd/ccsort/config"
 )
 
 var SortFunctions = map[config.SortingAlgo]func([]string){

@@ -3,7 +3,7 @@ package sortalgos_test
 import (
 	"testing"
 
-	"github.com/boxy-pug/ccsort/sortalgos"
+	"github.com/boxy-pug/go-coreutils/cmd/ccsort/sortalgos"
 	"github.com/google/go-cmp/cmp"
 )
 

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boxy-pug/ccsort/config"
-	"github.com/boxy-pug/ccsort/sortalgos"
+	"github.com/boxy-pug/go-coreutils/cmd/ccsort/config"
+	"github.com/boxy-pug/go-coreutils/cmd/ccsort/sortalgos"
 )
 
 func main() {

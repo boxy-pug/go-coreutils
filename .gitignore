@@ -1,0 +1,26 @@
+# Compiled binaries
+cmd/cccat/cccat
+cmd/ccgrep/ccgrep
+cmd/cchead/cchead
+cmd/ccsed/ccsed
+cmd/ccsort/ccsort
+cmd/cctail/cctail
+cmd/cctr/cctr
+cmd/ccuniq/ccuniq
+cmd/ccwc/ccwc
+cmd/ccxxd/ccxxd
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
