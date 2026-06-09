@@ -3,23 +3,23 @@
 > Go implementations of Unix core utilities — built as a learning project from
 > [CodingChallenges.fyi](https://codingchallenges.fyi/).
 
-Each tool is a hand-written, dependency-minimal clone of a classic Unix command,
-focused on understanding both the original tool's behavior and idiomatic Go patterns.
+Each tool is a hand-written clone of a classic Unix command,
+focused on understanding the original tool's behavior and Go coding.
 
 ## Tools
 
-| Tool | Unix | Description | Key Flags | Challenge |
-|------|------|-------------|-----------|-----------|
-| [`cccat`](cmd/cccat/) | `cat` | Concatenate and print files | `-n`, `-b` | [#1](https://codingchallenges.fyi/challenges/challenge-cat) |
-| [`ccgrep`](cmd/ccgrep/) | `grep` | Search files for patterns | `-r`, `-v`, `-i` | [#2](https://codingchallenges.fyi/challenges/challenge-grep) |
-| [`cchead`](cmd/cchead/) | `head` | Output the first part of files | `-n`, `-c` | [#3](https://codingchallenges.fyi/challenges/challenge-head) |
-| [`ccsed`](cmd/ccsed/) | `sed` | Stream editor for filtering/transforming text | `-n`, `-i` | [#4](https://codingchallenges.fyi/challenges/challenge-sed) |
-| [`ccsort`](cmd/ccsort/) | `sort` | Sort lines using multiple algorithms | `--algo`, `--test`, `-u`, `-v` | [#5](https://codingchallenges.fyi/challenges/challenge-sort) |
-| [`cctail`](cmd/cctail/) | `tail` | Output the last part of files | `-n` | [#6](https://codingchallenges.fyi/challenges/challenge-tail) |
-| [`cctr`](cmd/cctr/) | `tr` | Translate or delete characters | `-d`, `-s` | [#7](https://codingchallenges.fyi/challenges/challenge-tr) |
-| [`ccuniq`](cmd/ccuniq/) | `uniq` | Report or filter repeated lines | `-c`, `-d`, `-u` | [#8](https://codingchallenges.fyi/challenges/challenge-uniq) |
-| [`ccwc`](cmd/ccwc/) | `wc` | Count lines, words, bytes, and characters | `-c`, `-l`, `-w`, `-m` | [#9](https://codingchallenges.fyi/challenges/challenge-wc) |
-| [`ccxxd`](cmd/ccxxd/) | `xxd` | Hex dump and reverse hex dump | `-e`, `-r`, `-g`, `-c`, `-l`, `-s` | [#10](https://codingchallenges.fyi/challenges/challenge-xxd) |
+| Tool                    | Unix   | Description                                   | Challenge                                                                                    |
+| ----------------------- | ------ | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [`cccat`](cmd/cccat/)   | `cat`  | Concatenate and print files                   | [Build Your Own cat Tool](https://codingchallenges.fyi/challenges/challenge-cat)             |
+| [`ccgrep`](cmd/ccgrep/) | `grep` | Search files for patterns                     | [Build Your Own grep](https://codingchallenges.fyi/challenges/challenge-grep)                |
+| [`cchead`](cmd/cchead/) | `head` | Output the first part of files                | [Build Your Own head](https://codingchallenges.fyi/challenges/challenge-head)                |
+| [`ccsed`](cmd/ccsed/)   | `sed`  | Stream editor for filtering/transforming text | [Build Your Own Sed](https://codingchallenges.fyi/challenges/challenge-sed)                  |
+| [`ccsort`](cmd/ccsort/) | `sort` | Sort lines using multiple algorithms          | [Build Your Own Sort Tool](https://codingchallenges.fyi/challenges/challenge-sort)           |
+| [`cctail`](cmd/cctail/) | `tail` | Output the last part of files                 | [Build Your Own tail](https://codingchallenges.fyi/challenges/challenge-tail)                |
+| [`cctr`](cmd/cctr/)     | `tr`   | Translate or delete characters                | [Build Your Own tr Tool](https://codingchallenges.fyi/challenges/challenge-tr)               |
+| [`ccuniq`](cmd/ccuniq/) | `uniq` | Report or filter repeated lines               | [Build Your Own uniq Tool](https://codingchallenges.fyi/challenges/challenge-uniq)           |
+| [`ccwc`](cmd/ccwc/)     | `wc`   | Count lines, words, bytes, and characters     | [Build Your Own wc Tool](https://codingchallenges.fyi/challenges/challenge-wc)               |
+| [`ccxxd`](cmd/ccxxd/)   | `xxd`  | Hex dump and reverse hex dump                 | [Build Your Own Xxd](https://codingchallenges.fyi/challenges/challenge-xxd)                  |
 
 ## Quick Start
 
@@ -50,18 +50,15 @@ go install github.com/boxy-pug/go-coreutils/cmd/cchead@latest
 
 ## Project Philosophy
 
-- **Hand-written** — every line of Go is mine, written to learn, not generated.
-- **Stdlib-first** — only one external dependency (`go-cmp` for ccsort tests).
-- **Single-binary tools** — compile with `go build`, no frameworks, no installers.
-- **Honest learning** — each tool's README has a "What I Learned" section documenting real debugging experiences, gotchas, and insights.
+- Hand written and not perfect. Minimal ai use, for helping with explaining concepts, pointing to good std lib funcs, helping with tests, not generating code.
+- Each tool's README has a "What i learned" section documenting real debugging experiences, gotchas, and insights.
 
 ## About
 
 This monorepo consolidates what were originally 10 separate repositories into one
-discoverable project. [CodingChallenges.fyi](https://codingchallenges.fyi/challenges/)
-provides the challenge prompts; I provide the implementations — warts, lessons,
-and all.
+project.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+

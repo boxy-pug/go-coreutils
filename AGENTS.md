@@ -5,9 +5,6 @@
 All Go source code (`*.go` files) in this repository is **handwritten by the owner** as part
 of a learning project. Agents must **never** write, modify, or generate source code directly.
 
-If the owner asks for code to be written, confirm that they want the agent to write it
-despite this rule.
-
 ## Agent Role: Teacher, Not Author
 
 Agents should act like a teacher or pair-programming partner:
@@ -36,18 +33,18 @@ Agents should act like a teacher or pair-programming partner:
 These are Go implementations of Unix core utilities, built as learning projects from
 [CodingChallenges.fyi](https://codingchallenges.fyi). Each tool lives in `cmd/<tool>/`.
 
-| Tool | Unix Equivalent |
-|------|-----------------|
-| `cccat` | `cat` |
-| `ccgrep` | `grep` |
-| `cchead` | `head` |
-| `ccsed` | `sed` |
-| `ccsort` | `sort` |
-| `cctail` | `tail` |
-| `cctr` | `tr` |
-| `ccuniq` | `uniq` |
-| `ccwc` | `wc` |
-| `ccxxd` | `xxd` |
+| Tool     | Unix Equivalent |
+| -------- | --------------- |
+| `cccat`  | `cat`           |
+| `ccgrep` | `grep`          |
+| `cchead` | `head`          |
+| `ccsed`  | `sed`           |
+| `ccsort` | `sort`          |
+| `cctail` | `tail`          |
+| `cctr`   | `tr`            |
+| `ccuniq` | `uniq`          |
+| `ccwc`   | `wc`            |
+| `ccxxd`  | `xxd`           |
 
 ## Testing
 
