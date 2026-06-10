@@ -108,8 +108,7 @@ func TestNumberedNonBlank(t *testing.T) {
 
 func TestNumberedNonBlankRegression(t *testing.T) {
 	// Regression test: old bug numbered empty lines or omitted line content.
-	// This test would fail with fmt.Printf("%6d\t\n", lineIndex) or with
-	// broken -b logic that numbers empty lines.
+	// This test would fail with broken -b logic that numbers empty lines.
 	cmd := exec.Command("go", "run", ".", "-b", "./testdata/test3.txt")
 	got, err := cmd.CombinedOutput()
 	if err != nil {

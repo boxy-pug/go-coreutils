@@ -35,7 +35,7 @@ go install github.com/boxy-pug/go-coreutils/cmd/ccsort@latest
 
 ## What I learned
 
-- The sort from coreutil compares strings in a way that accounts for dictonary order, where upper vs lowercase is secondary. I've built a pure byte-by-byte version like LC_COLLATE=C, the c or posix locale: strict ascii/byte by byte ordering.
+- The sort from coreutil compares strings in a way that accounts for dictonary order, where upper vs lowercase is secondary. It has to do with "locale aware" string comp. I've built a pure byte-by-byte version like LC_COLLATE=C, the c or posix locale: strict ascii/byte by byte ordering.
 - log.Fatalf adds timestamp prefixes and is otherwise the same as fmt.Fprintln(os.Stderr, ...) followed by os.Exit(1). For use on stuff running on a server for example.
 - Posix convention for reading from stdin is "-" as the filename.
 - When using bufio.Scanner.Scan() it returns false for both EOF and read errors. Check scanner.Err() after each loop.
