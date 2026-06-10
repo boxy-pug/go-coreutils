@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 )
 
 var (
@@ -15,46 +14,45 @@ var (
 
 func main() {
 	flag.Parse()
+	args := flag.Args()
 
-	if len(os.Args) == 1 || os.Args[1] == "-" {
+	if len(args) == 0 || args[0] == "-" {
 		catInput(os.Stdin)
 	} else {
-		for _, arg := range os.Args[1:] {
-			if strings.HasPrefix(strings.TrimSpace(arg), "-") {
-				continue
-			}
-			// fmt.Printf("Parsing file: %s\n", arg)
+		for _, arg := range args {
 			file, err := os.Open(arg)
 			if err != nil {
 				fmt.Printf("error opening %s: %v\n", arg, err)
 			}
-			defer file.Close()
 			catInput(file)
+			file.Close()
 		}
 	}
 }
 
 func catInput(file *os.File) {
 	scanner := bufio.NewScanner(file)
-	lineIndex := 0
-	// lastLine := ""
-	// lastLineHadNewline := false
+	lineIndex := 1
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		// lastLine = line
-		// lastLineHadNewline = strings.HasSuffix(lastLine, "\n")
+
+		if *numberedLinesJumpEmpty && line == "" {
+			fmt.Println("")
+			continue
+		}
 
 		if *numberedLines || *numberedLinesJumpEmpty {
-			if line == "" && *numberedLinesJumpEmpty {
-				fmt.Printf("%s\n", line)
-				continue
-			}
-			lineIndex += 1
-			fmt.Printf("     %d\t\n", lineIndex)
+			fmt.Printf("%6d\t%s\n", lineIndex, line)
 		} else {
 			fmt.Println(line)
 		}
 
+		lineIndex += 1
+
+		if err := scanner.Err(); err != nil {
+			fmt.Printf("error reading input: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
