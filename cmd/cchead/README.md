@@ -34,4 +34,4 @@ go install github.com/boxy-pug/go-coreutils/cmd/cchead@latest
 ## What I learned
 
 - `bufio.Scanner` vs. `bufio.Reader`: Scanner is simpler but strips newlines, which causes issues with `\r\n` vs `\n`. Reader gives more control but requires careful EOF and error handling.
-- For integration testing CLI tools, use the `exec` package to compare your tool's output to the real command — very handy when building a clone.
+- For integration testing CLI tools, use the `exec` package to run local commands and capture their output, to compare your tool's output to the real command — very handy when building a clone.

@@ -16,7 +16,6 @@ type command struct {
 	useLines      bool
 	useBytes      bool
 	multipleFiles bool
-	stdIn         bool
 }
 
 type inputFile struct {
@@ -59,7 +58,6 @@ func loadCommand() (command, func(), error) {
 			reader: os.Stdin,
 		})
 		cmd.multipleFiles = false
-		cmd.stdIn = true
 	case len(args) > 0:
 		var files []*os.File
 		for _, a := range args {
@@ -120,12 +118,14 @@ func printHeadLines(r io.Reader, w io.Writer, n int) error {
 	for range n {
 		line, err := reader.ReadBytes('\n')
 		if len(line) > 0 {
-			w.Write(line)
-		}
-		if err == io.EOF {
-			break
+			if _, werr := w.Write(line); werr != nil {
+				return werr
+			}
 		}
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return err
 		}
 	}
