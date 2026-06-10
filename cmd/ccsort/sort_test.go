@@ -1,9 +1,8 @@
-package sortalgos_test
+package main
 
 import (
 	"testing"
 
-	"github.com/boxy-pug/go-coreutils/cmd/ccsort/sortalgos"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -36,7 +35,7 @@ func TestSortingAlgorithms(t *testing.T) {
 		// Add more complex or edge case test cases as needed
 	}
 
-	for name, sortFunc := range sortalgos.SortFunctions {
+	for name, sortFunc := range sortFunctions {
 		for _, tc := range testCases {
 			t.Run(tc.name+"_"+string(name), func(t *testing.T) {
 				list := make([]string, len(tc.input))

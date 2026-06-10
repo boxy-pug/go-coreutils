@@ -1,28 +1,26 @@
-package sortalgos
+package main
 
 import (
 	"slices"
 	"strings"
-
-	"github.com/boxy-pug/go-coreutils/cmd/ccsort/config"
 )
 
-var SortFunctions = map[config.SortingAlgo]func([]string){
-	config.StdLib:    StdLib,
-	config.Bubble:    Bubble,
-	config.Merge:     Merge,
-	config.Insertion: InsertionSort,
-	config.Quick:     QuickSortHelper,
-	config.Selection: Selection,
+var sortFunctions = map[string]func([]string){
+	"stdlib":    stdLibSort,
+	"bubble":    bubbleSort,
+	"merge":     mergeSort,
+	"insertion": insertionSort,
+	"quick":     quickSortHelper,
+	"selection": selectionSort,
 }
 
-func StdLib(list []string) {
+func stdLibSort(list []string) {
 	slices.SortFunc(list, func(a, b string) int {
 		return strings.Compare(a, b)
 	})
 }
 
-func Bubble(list []string) {
+func bubbleSort(list []string) {
 	swapping := true
 	end := len(list)
 
@@ -38,7 +36,7 @@ func Bubble(list []string) {
 	}
 }
 
-func Merge(list []string) {
+func mergeSort(list []string) {
 	if len(list) < 2 {
 		return
 	}
@@ -50,8 +48,8 @@ func Merge(list []string) {
 	copy(left, list[:mid])
 	copy(right, list[mid:])
 
-	Merge(left)
-	Merge(right)
+	mergeSort(left)
+	mergeSort(right)
 
 	mergeInPlace(list, left, right)
 }
@@ -82,7 +80,7 @@ func mergeInPlace(list, left, right []string) {
 	}
 }
 
-func InsertionSort(list []string) {
+func insertionSort(list []string) {
 	for i := range list {
 		j := i
 		for j > 0 && list[j-1] > list[j] {
@@ -92,17 +90,17 @@ func InsertionSort(list []string) {
 	}
 }
 
-func QuickSortHelper(list []string) {
+func quickSortHelper(list []string) {
 	low := 0
 	high := len(list) - 1
-	QuickSort(list, low, high)
+	quickSort(list, low, high)
 }
 
-func QuickSort(list []string, low, high int) {
+func quickSort(list []string, low, high int) {
 	if low < high {
 		pivot := partition(list, low, high)
-		QuickSort(list, low, pivot-1)
-		QuickSort(list, pivot+1, high)
+		quickSort(list, low, pivot-1)
+		quickSort(list, pivot+1, high)
 	}
 }
 
@@ -120,24 +118,24 @@ func partition(list []string, low, high int) int {
 	return i + 1
 }
 
-// Selection sort iterates through the slice, finds the minimum element in the unsorted portion,
+// selectionSort sort iterates through the slice, finds the minimum element in the unsorted portion,
 // and swaps it with the first element of the unsorted portion.
-func Selection(list []string) {
+func selectionSort(list []string) {
 	// Outer loop: iterates through each element of the slice
 	for i := range list {
 		// Assume the current index is the minimum
-		min_idx := i
+		minIdx := i
 
 		// Inner loop: finds the actual minimum element in the unsorted portion
 		for j := i + 1; j < len(list); j++ {
 			// Compare the current element with the assumed minimum
-			if list[j] < list[min_idx] {
+			if list[j] < list[minIdx] {
 				// Update the minimum index if a smaller element is found
-				min_idx = j
+				minIdx = j
 			}
 		}
 
 		// Swap the found minimum element with the first element of the unsorted portion
-		list[i], list[min_idx] = list[min_idx], list[i]
+		list[i], list[minIdx] = list[minIdx], list[i]
 	}
 }
