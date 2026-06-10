@@ -40,22 +40,20 @@ yes man great!`
 }
 
 func TestMultipleFiles(t *testing.T) {
-	cmd := exec.Command("go", "run", "main.go", "./testdata/test3.txt", "./testdata/test4.txt")
-	output, err := cmd.CombinedOutput()
+	cmd := exec.Command("go", "run", ".", "./testdata/test3.txt", "./testdata/test4.txt")
+	got, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Command failed with error: %v", err)
 	}
 
-	expected := `hello
-goodbye
+	unixCmd := exec.Command("cat", "./testdata/test3.txt", "./testdata/test4.txt")
+	want, err := unixCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed with error: %v", err)
+	}
 
-yes man great!
-checking 
-
-this is good
-`
-	if string(output) != expected {
-		t.Errorf("Expected %q, got %q", expected, string(output))
+	if string(got) != string(want) {
+		t.Errorf("Expected %q, got %q", string(want), string(got))
 	}
 }
 
@@ -73,6 +71,54 @@ func TestNumberedLines(t *testing.T) {
 	}
 	if string(got) != string(want) {
 		t.Errorf("Expected %q, got %q", string(want), string(got))
+	}
+}
+
+func TestNumberedLinesRegression(t *testing.T) {
+	// Regression test: old bug printed line numbers without actual line content.
+	// This test would fail with fmt.Printf("%6d\t\n", lineIndex).
+	cmd := exec.Command("go", "run", ".", "-n", "./testdata/test3.txt")
+	got, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed with error: %v", err)
+	}
+
+	want := "     1\thello\n     2\tgoodbye\n     3\t\n     4\tyes man great!"
+	if string(got) != want {
+		t.Errorf("Expected %q, got %q", want, string(got))
+	}
+}
+
+func TestNumberedNonBlank(t *testing.T) {
+	cmd := exec.Command("go", "run", ".", "-b", "./testdata/test3.txt")
+	got, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed with error: %v", err)
+	}
+
+	unixCmd := exec.Command("cat", "-b", "./testdata/test3.txt")
+	want, err := unixCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed with error: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Errorf("Expected %q, got %q", string(want), string(got))
+	}
+}
+
+func TestNumberedNonBlankRegression(t *testing.T) {
+	// Regression test: old bug numbered empty lines or omitted line content.
+	// This test would fail with fmt.Printf("%6d\t\n", lineIndex) or with
+	// broken -b logic that numbers empty lines.
+	cmd := exec.Command("go", "run", ".", "-b", "./testdata/test3.txt")
+	got, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed with error: %v", err)
+	}
+
+	want := "     1\thello\n     2\tgoodbye\n\n     3\tyes man great!"
+	if string(got) != want {
+		t.Errorf("Expected %q, got %q", want, string(got))
 	}
 }
 

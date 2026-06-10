@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -30,28 +31,38 @@ func main() {
 	}
 }
 
+// catInput cats the file or stdin input to stdout
 func catInput(file *os.File) {
-	scanner := bufio.NewScanner(file)
+
+	// Regular cat is just io.Copy
+	if !*numberedLines && !*numberedLinesJumpEmpty {
+		_, err := io.Copy(os.Stdout, file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading stdin: %s", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Make a reader to read line by line
+	reader := bufio.NewReader(file)
 	lineIndex := 1
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for {
+		line, err := reader.ReadString('\n') // This preserves the newline in line
 
-		if *numberedLinesJumpEmpty && line == "" {
-			fmt.Println("")
-			continue
-		}
-
-		if *numberedLines || *numberedLinesJumpEmpty {
-			fmt.Printf("%6d\t%s\n", lineIndex, line)
+		if *numberedLinesJumpEmpty && (line == "" || line == "\n") {
+			fmt.Printf("%s", line)
 		} else {
-			fmt.Println(line)
+			fmt.Printf("%6d\t%s", lineIndex, line)
+			lineIndex += 1
 		}
 
-		lineIndex += 1
-
-		if err := scanner.Err(); err != nil {
-			fmt.Printf("error reading input: %v\n", err)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Fprintf(os.Stderr, "error reading file: %s", err)
 			os.Exit(1)
 		}
 	}
