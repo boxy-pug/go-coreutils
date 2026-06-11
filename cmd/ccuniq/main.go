@@ -1,5 +1,6 @@
 // ccuniq reads an input file comparing adjacent lines, and writes each unique
-// line to stdout. Supports counting repeated lines, repeated lines or unique lines only.
+// line to stdout. Supports counting, only outputting repeated lines or
+// only unique lines.
 package main
 
 import (
