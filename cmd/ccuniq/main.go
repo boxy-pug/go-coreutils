@@ -1,6 +1,6 @@
 // ccuniq reads an input file comparing adjacent lines, and writes each unique
-// line to stdout. Supports counting, only outputting repeated lines or
-// only unique lines.
+// line to stdout. Supports counting, only outputting repeated lines,
+// only unique lines and case insensitive comparison.
 package main
 
 import (
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // config holds flags and input reader and output writer
@@ -17,6 +18,7 @@ type config struct {
 	countCol     bool      // -c, --count
 	repeatedOnly bool      // -d, --repeated
 	uniqueOnly   bool      // -u --unique
+	ignoreCase   bool      // -i --ignore-case
 	in           io.Reader // uniq only supports one input file
 	out          io.Writer
 }
@@ -49,9 +51,14 @@ func (cfg *config) runUniq() error {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// line is same as previous, still in same group
-		// increment counter and continue
-		if line == prevLine {
+		// case insensitive, still in same group, increment counter and continue
+		if cfg.ignoreCase && strings.EqualFold(line, prevLine) {
+			prevCount++
+			continue
+		}
+
+		// still in same group, increment counter and continue
+		if !cfg.ignoreCase && line == prevLine {
 			prevCount++
 			continue
 		}
@@ -105,10 +112,15 @@ func loadConfig() (config, func(), error) {
 
 	flag.BoolVar(&cfg.countCol, "c", false, "enable count column")
 	flag.BoolVar(&cfg.countCol, "count", false, "enable count column")
+
 	flag.BoolVar(&cfg.repeatedOnly, "d", false, "output only repeated")
 	flag.BoolVar(&cfg.repeatedOnly, "repeated", false, "output only repeated")
+
 	flag.BoolVar(&cfg.uniqueOnly, "u", false, "output only unique")
 	flag.BoolVar(&cfg.uniqueOnly, "unique", false, "output only unique")
+
+	flag.BoolVar(&cfg.ignoreCase, "i", false, "case insensitive comparison")
+	flag.BoolVar(&cfg.ignoreCase, "ignore-case", false, "case insensitive comparison")
 
 	flag.Parse()
 	paths := flag.Args()
@@ -143,7 +155,6 @@ func loadConfig() (config, func(), error) {
 			cleanup = func() { file.Close() }
 		}
 		// open second path as file to write to
-		cfg.writeToFile = true
 		cfg.out, err = os.Create(paths[1])
 		if err != nil {
 			return config{}, cleanup, fmt.Errorf("creating file: %w", err)

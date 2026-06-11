@@ -155,6 +155,62 @@ func TestUniqUnit(t *testing.T) {
 		}
 		assertEqual(t, buf.String(), "a\n")
 	})
+
+	t.Run("ignore case default", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := config{
+			in:         strings.NewReader("A\na\nb\nB\na\n"),
+			out:        &buf,
+			ignoreCase: true,
+		}
+		if err := cfg.runUniq(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// A and a collapse; b and B collapse; final a is new group
+		assertEqual(t, buf.String(), "A\nb\na\n")
+	})
+
+	t.Run("ignore case with count", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := config{
+			in:         strings.NewReader("A\na\na\nb\nB\n"),
+			out:        &buf,
+			countCol:   true,
+			ignoreCase: true,
+		}
+		if err := cfg.runUniq(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertEqual(t, buf.String(), "      3 A\n      2 b\n")
+	})
+
+	t.Run("ignore case repeated only", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := config{
+			in:           strings.NewReader("A\na\nb\nB\nc\n"),
+			out:          &buf,
+			repeatedOnly: true,
+			ignoreCase:   true,
+		}
+		if err := cfg.runUniq(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertEqual(t, buf.String(), "A\nb\n")
+	})
+
+	t.Run("ignore case unique only", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := config{
+			in:         strings.NewReader("A\na\nb\nB\nc\n"),
+			out:        &buf,
+			uniqueOnly: true,
+			ignoreCase: true,
+		}
+		if err := cfg.runUniq(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertEqual(t, buf.String(), "c\n")
+	})
 }
 
 func TestUniqIntegration(t *testing.T) {
