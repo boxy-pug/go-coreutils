@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"log"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -12,22 +10,22 @@ import (
 func TestWcUnit(t *testing.T) {
 	t.Run("normal wordcount cmd", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input: strings.NewReader(`Hello testing
+					input: strings.NewReader(`Hello testing
 yes yes cool
 ok goodbye now
 `),
 				},
 			},
-			Output:    &buf,
-			WordsFlag: true,
-			LinesFlag: true,
-			BytesFlag: true,
+			out:       &buf,
+			wordsFlag: true,
+			linesFlag: true,
+			bytesFlag: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		got := buf.String()
 		want := "       3       8      42\n"
@@ -37,23 +35,23 @@ ok goodbye now
 
 	t.Run("charcount from file with emojis, with filename", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input: strings.NewReader(`Hello testing😊
+					input: strings.NewReader(`Hello testing😊
 yes yes cool
 ok goodbye 🌟now
 `),
-					FileName: "faketest.txt",
+					name: "faketest.txt",
 				},
 			},
 
-			Output:           &buf,
-			CharsFlag:        true,
-			FileNameProvided: true,
+			out:              &buf,
+			charsFlag:        true,
+			fileNameProvided: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		// This counts Unicode code points (runes), not bytes or grapheme clusters.
 		// 1 emoji = 1 rune = 1 char
@@ -65,19 +63,19 @@ ok goodbye 🌟now
 
 	t.Run("charcount from file with emojis, no trailing newline", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input:    strings.NewReader("Hello testing😊\nyes yes cool\nok goodbye 🌟now"), // no final '\n'
-					FileName: "faketest.txt",
+					input: strings.NewReader("Hello testing😊\nyes yes cool\nok goodbye 🌟now"), // no final '\n'
+					name:  "faketest.txt",
 				},
 			},
-			Output:           &buf,
-			CharsFlag:        true,
-			FileNameProvided: true,
+			out:              &buf,
+			charsFlag:        true,
+			fileNameProvided: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		got := buf.String()
 		want := "      43 faketest.txt\n" // This is the expected count if the last line is counted
@@ -87,21 +85,21 @@ ok goodbye 🌟now
 
 	t.Run("wc counts with multiple empty lines and a regular line", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input:    strings.NewReader("\n\n\nHello world\n"),
-					FileName: "faketest.txt",
+					input: strings.NewReader("\n\n\nHello world\n"),
+					name:  "faketest.txt",
 				},
 			},
-			Output:           &buf,
-			LinesFlag:        true,
-			WordsFlag:        true,
-			BytesFlag:        true,
-			FileNameProvided: true,
+			out:              &buf,
+			linesFlag:        true,
+			wordsFlag:        true,
+			bytesFlag:        true,
+			fileNameProvided: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		got := buf.String()
 		// 3 empty lines + "Hello world\n" = 4 lines
@@ -114,19 +112,19 @@ ok goodbye 🌟now
 
 	t.Run("empty file", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input: strings.NewReader(""),
+					input: strings.NewReader(""),
 				},
 			},
-			Output:    &buf,
-			WordsFlag: true,
-			LinesFlag: true,
-			BytesFlag: true,
+			out:       &buf,
+			wordsFlag: true,
+			linesFlag: true,
+			bytesFlag: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		got := buf.String()
 		want := "       0       0       0\n"
@@ -136,31 +134,31 @@ ok goodbye 🌟now
 
 	t.Run("multiple files", func(t *testing.T) {
 		var buf bytes.Buffer
-		cmd := Command{
-			Files: []FileInput{
+		cmd := command{
+			files: []fileInput{
 				{
-					Input: strings.NewReader(`Hello testing
+					input: strings.NewReader(`Hello testing
 yes yes cool
 ok goodbye now
 `),
-					FileName: "file1.txt",
+					name: "file1.txt",
 				},
 				{
-					Input: strings.NewReader(`Hello testing
+					input: strings.NewReader(`Hello testing
 yes yes cool
 ok goodbye now
 `),
-					FileName: "file2.txt",
+					name: "file2.txt",
 				},
 			},
-			Output:           &buf,
-			WordsFlag:        true,
-			LinesFlag:        true,
-			BytesFlag:        true,
-			FileNameProvided: true,
+			out:              &buf,
+			wordsFlag:        true,
+			linesFlag:        true,
+			bytesFlag:        true,
+			fileNameProvided: true,
 		}
 
-		cmd.Run()
+		cmd.run()
 
 		got := buf.String()
 		want := "       3       8      42 file1.txt\n" +
@@ -171,98 +169,125 @@ ok goodbye now
 	})
 }
 
-// Old integration tests
+// Integration tests using the actual binary output.
+// We compare against hardcoded strings instead of the system wc
+// because different systems ship different wc implementations (gnu vs bsd)
 func TestWcIntegration(t *testing.T) {
-	testFiles := getTestFiles("./testdata/")
-
-	t.Run("Test Wc without flags", func(t *testing.T) {
-		for _, testFile := range testFiles {
-			cmd := exec.Command("./ccwc", testFile)
-			got, err := cmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", cmd.String(), err)
-			}
-
-			unixCmd := exec.Command("wc", testFile)
-			want, err := unixCmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", unixCmd.String(), err)
-			}
-
-			assertEqual(t, string(got), string(want))
-		}
-	})
-
-	t.Run("Test wc with lines flag", func(t *testing.T) {
-		for _, testFile := range testFiles {
-			cmd := exec.Command("./ccwc", "-l", testFile)
-			got, err := cmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", cmd.String(), err)
-			}
-
-			unixCmd := exec.Command("wc", "-l", testFile)
-			want, err := unixCmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", unixCmd.String(), err)
-			}
-
-			assertEqual(t, string(got), string(want))
-		}
-	})
-
-	t.Run("Test with bytes flag", func(t *testing.T) {
-		for _, testFile := range testFiles {
-			cmd := exec.Command("./ccwc", "-c", testFile)
-			got, err := cmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", cmd.String(), err)
-			}
-
-			unixCmd := exec.Command("wc", "-c", testFile)
-			want, err := unixCmd.Output()
-			if err != nil {
-				t.Fatalf("Command %s failed with error: %v", unixCmd.String(), err)
-			}
-
-			assertEqual(t, string(got), string(want))
-		}
-	})
-
-	t.Run("Test wc with multiple files", func(t *testing.T) {
-		cmd := exec.Command("./ccwc", testFiles...)
+	t.Run("no flags - single file", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "./testdata/emoji.txt")
 		got, err := cmd.Output()
 		if err != nil {
-			t.Fatalf("Command %s failed with error: %v", cmd.String(), err)
+			t.Fatalf("command failed: %v", err)
 		}
+		want := "       7       8      60 ./testdata/emoji.txt\n"
+		assertEqual(t, string(got), want)
+	})
 
-		unixCmd := exec.Command("wc", testFiles...)
-		want, err := unixCmd.Output()
+	t.Run("lines flag", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-l", "./testdata/test3.txt")
+		got, err := cmd.Output()
 		if err != nil {
-			t.Fatalf("Command %s failed with error: %v", unixCmd.String(), err)
+			t.Fatalf("command failed: %v", err)
 		}
+		want := "      11 ./testdata/test3.txt\n"
+		assertEqual(t, string(got), want)
+	})
 
-		assertEqual(t, string(got), string(want))
+	t.Run("bytes flag", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-c", "./testdata/test2.txt")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "  163530 ./testdata/test2.txt\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("multiple files with total", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".",
+			"./testdata/emoji.txt",
+			"./testdata/test3.txt",
+		)
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "       7       8      60 ./testdata/emoji.txt\n" +
+			"      11       8      58 ./testdata/test3.txt\n" +
+			"      18      16     118 total\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("stdin with no flags", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".")
+		cmd.Stdin = strings.NewReader("Hello testing\nyes yes cool\nok goodbye now\n")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "       3       8      42\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("chars flag with emoji file", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-m", "./testdata/emoji.txt")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "      54 ./testdata/emoji.txt\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("words flag alone", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-w", "./testdata/test3.txt")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "       8 ./testdata/test3.txt\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("mixed flags -l and -w", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-l", "-w", "./testdata/test3.txt")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "      11       8 ./testdata/test3.txt\n"
+		assertEqual(t, string(got), want)
+	})
+
+	t.Run("multiple stdin dashes", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "-", "-")
+		cmd.Stdin = strings.NewReader("test\n")
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("command failed: %v", err)
+		}
+		want := "       1       1       5 -\n" +
+			"       0       0       0 -\n" +
+			"       1       1       5 total\n"
+		assertEqual(t, string(got), want)
+	})
+
+	// Note: `go run` appends "exit status 1" to stderr when the program exits
+	// non-zero. If running a pre-built binary instead, that line won't appear.
+	t.Run("non-existent file exits with error", func(t *testing.T) {
+		cmd := exec.Command("go", "run", ".", "./testdata/nonexistent.txt")
+		got, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatalf("expected command to fail, but it succeeded")
+		}
+		want := "loading command: open \"./testdata/nonexistent.txt\": open ./testdata/nonexistent.txt: no such file or directory\nexit status 1\n"
+		assertEqual(t, string(got), want)
 	})
 }
 
 func assertEqual(t testing.TB, got, want string) {
 	t.Helper()
 	if got != want {
-		t.Errorf("got  %q/nwant %q/n", got, want)
+		t.Errorf("got  %q\nwant %q\n", got, want)
 	}
-}
-
-func getTestFiles(testFolder string) []string {
-	var res []string
-
-	files, err := os.ReadDir(testFolder)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, file := range files {
-		res = append(res, testFolder+file.Name())
-	}
-	return res
 }

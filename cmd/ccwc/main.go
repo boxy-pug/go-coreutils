@@ -1,3 +1,5 @@
+// ccwc counts lines, words, bytes, and characters in files or from stdin.
+// Unicode-aware character counting via runes.
 package main
 
 import (
@@ -10,58 +12,58 @@ import (
 	"unicode/utf8"
 )
 
-// Command holds config and state for the wc command
-type Command struct {
-	Output           io.Writer
-	Files            []FileInput
-	TotalCounter     WordCounter
-	BytesFlag        bool
-	LinesFlag        bool
-	WordsFlag        bool
-	CharsFlag        bool
-	FileNameProvided bool
+// command holds config and state for the wc command
+type command struct {
+	out              io.Writer
+	files            []fileInput
+	total            counter
+	bytesFlag        bool // -c for bytes
+	linesFlag        bool // -l for lines
+	wordsFlag        bool // -w for words
+	charsFlag        bool // -m for chars
+	fileNameProvided bool
 }
 
-// FileInput represents single file or input stream
-type FileInput struct {
-	FileName string
-	Counter  WordCounter
-	Input    io.Reader
+// fileInput represents single file or input stream
+type fileInput struct {
+	name    string
+	counter counter
+	input   io.Reader
 }
 
-// WordCounter tracks the count
-type WordCounter struct {
-	Lines int
-	Words int
-	Chars int
-	Bytes int
+// counter tracks the count
+type counter struct {
+	lines int
+	words int
+	chars int
+	bytes int
 }
 
 func main() {
 	cmd, cleanup, err := loadCommand()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error loading command:", err)
+		fmt.Fprintf(os.Stderr, "loading command: %v\n", err)
 		os.Exit(1)
 	}
 	defer cleanup()
 
-	err = cmd.Run()
+	err = cmd.run()
 	if err != nil {
-		fmt.Fprintln(cmd.Output, "error running wc command:", err)
+		fmt.Fprintf(os.Stderr, "running wc command: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 // loadCommand parses cmdline flags and input files, returns configured command
-func loadCommand() (Command, func(), error) {
-	cmd := Command{
-		Output: os.Stdout,
+func loadCommand() (command, func(), error) {
+	cmd := command{
+		out: os.Stdout,
 	}
 
-	flag.BoolVar(&cmd.BytesFlag, "c", false, "count bytes")
-	flag.BoolVar(&cmd.LinesFlag, "l", false, "count lines")
-	flag.BoolVar(&cmd.WordsFlag, "w", false, "count words")
-	flag.BoolVar(&cmd.CharsFlag, "m", false, "count chars")
+	flag.BoolVar(&cmd.bytesFlag, "c", false, "count bytes")
+	flag.BoolVar(&cmd.linesFlag, "l", false, "count lines")
+	flag.BoolVar(&cmd.wordsFlag, "w", false, "count words")
+	flag.BoolVar(&cmd.charsFlag, "m", false, "count chars")
 
 	// Customize the usage message
 	flag.Usage = func() {
@@ -72,36 +74,45 @@ func loadCommand() (Command, func(), error) {
 	}
 
 	flag.Parse()
-	args := flag.Args()
+	paths := flag.Args()
 
 	// If no flags provided, enable standard wc options: lines, words and bytes
-	if !cmd.BytesFlag && !cmd.LinesFlag && !cmd.WordsFlag && !cmd.CharsFlag {
-		cmd.LinesFlag, cmd.WordsFlag, cmd.BytesFlag = true, true, true
+	if !cmd.bytesFlag && !cmd.linesFlag && !cmd.wordsFlag && !cmd.charsFlag {
+		cmd.linesFlag, cmd.wordsFlag, cmd.bytesFlag = true, true, true
 	}
 
 	var cleanup func() = func() {}
 
 	switch {
 	// no files provided: use stdin
-	case len(args) == 0:
-		cmd.FileNameProvided = false
-		cmd.Files = append(cmd.Files, FileInput{
-			Input: os.Stdin,
+	case len(paths) == 0:
+		cmd.fileNameProvided = false
+		cmd.files = append(cmd.files, fileInput{
+			input: os.Stdin,
 		})
-	case len(args) > 0:
+	case len(paths) > 0:
 		var files []*os.File
-		for _, a := range args {
-			file, err := os.Open(a)
+		for _, path := range paths {
+			// Support "-" for stdin, can be combined with files, with name "-"
+			if path == "-" {
+				cmd.fileNameProvided = true
+				cmd.files = append(cmd.files, fileInput{
+					name:  path,
+					input: os.Stdin,
+				})
+				continue
+			}
+			file, err := os.Open(path)
 			if err != nil {
-				return cmd, cleanup, fmt.Errorf("couldn't open file %v, error: %v", a, err)
+				return cmd, cleanup, fmt.Errorf("open %q: %w", path, err)
 			}
 			files = append(files, file)
-			cmd.Files = append(cmd.Files, FileInput{
-				FileName: file.Name(),
-				Input:    file,
+			cmd.files = append(cmd.files, fileInput{
+				name:  file.Name(),
+				input: file,
 			})
 		}
-		cmd.FileNameProvided = true
+		cmd.fileNameProvided = true
 
 		cleanup = func() {
 			for _, f := range files {
@@ -112,11 +123,11 @@ func loadCommand() (Command, func(), error) {
 	return cmd, cleanup, nil
 }
 
-// Run processes each input, updates count and prints result
-func (cmd *Command) Run() error {
-	for i := range cmd.Files {
-		input := cmd.Files[i]
-		reader := bufio.NewReader(input.Input)
+// run processes each input, updates count and prints result
+func (cmd *command) run() error {
+	for i := range cmd.files {
+		input := cmd.files[i]
+		reader := bufio.NewReader(input.input)
 
 		for {
 			line, err := reader.ReadString('\n')
@@ -126,70 +137,70 @@ func (cmd *Command) Run() error {
 				break
 			}
 
-			if cmd.LinesFlag {
-				input.Counter.Lines++
+			if cmd.linesFlag {
+				input.counter.lines++
 			}
-			if cmd.WordsFlag {
-				input.Counter.Words += len(strings.Fields(line))
+			if cmd.wordsFlag {
+				input.counter.words += len(strings.Fields(line))
 			}
-			if cmd.BytesFlag {
-				input.Counter.Bytes += len(line)
+			if cmd.bytesFlag {
+				input.counter.bytes += len(line)
 			}
-			if cmd.CharsFlag {
-				input.Counter.Chars += utf8.RuneCountInString(line)
+			if cmd.charsFlag {
+				input.counter.chars += utf8.RuneCountInString(line)
 			}
 
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("reading input: %w", err)
 			}
 		}
-		printResult(input.Counter, *cmd, input.FileName)
+		printResult(input.counter, *cmd, input.name)
 
-		if len(cmd.Files) > 1 {
-			cmd.addCountToTotal(input.Counter)
+		if len(cmd.files) > 1 {
+			cmd.addCountToTotal(input.counter)
 		}
 	}
-	if len(cmd.Files) > 1 {
-		printResult(cmd.TotalCounter, *cmd, "total")
+	if len(cmd.files) > 1 {
+		printResult(cmd.total, *cmd, "total")
 	}
 	return nil
 }
 
 // printResult prints the count for each result and total
-func printResult(counter WordCounter, cmd Command, fileName string) {
-	if cmd.LinesFlag {
-		fmt.Fprintf(cmd.Output, "%8d", counter.Lines)
+func printResult(counter counter, cmd command, fileName string) {
+	if cmd.linesFlag {
+		fmt.Fprintf(cmd.out, "%8d", counter.lines)
 	}
-	if cmd.WordsFlag {
-		fmt.Fprintf(cmd.Output, "%8d", counter.Words)
+	if cmd.wordsFlag {
+		fmt.Fprintf(cmd.out, "%8d", counter.words)
 	}
-	if cmd.BytesFlag {
-		fmt.Fprintf(cmd.Output, "%8d", counter.Bytes)
+	if cmd.bytesFlag {
+		fmt.Fprintf(cmd.out, "%8d", counter.bytes)
 	}
-	if cmd.CharsFlag {
-		fmt.Fprintf(cmd.Output, "%8d", counter.Chars)
+	if cmd.charsFlag {
+		fmt.Fprintf(cmd.out, "%8d", counter.chars)
 	}
-	if cmd.FileNameProvided {
-		fmt.Fprintf(cmd.Output, " %s", fileName)
+	if cmd.fileNameProvided {
+		fmt.Fprintf(cmd.out, " %s", fileName)
 	}
-	fmt.Fprintln(cmd.Output)
+	fmt.Fprintln(cmd.out)
 }
 
 // addCountToTotal accumulates count for the total line when multiple files are provided
-func (cmd *Command) addCountToTotal(input WordCounter) {
-	if cmd.LinesFlag {
-		cmd.TotalCounter.Lines += input.Lines
+func (cmd *command) addCountToTotal(input counter) {
+	if cmd.linesFlag {
+		cmd.total.lines += input.lines
 	}
-	if cmd.WordsFlag {
-		cmd.TotalCounter.Words += input.Words
+	if cmd.wordsFlag {
+		cmd.total.words += input.words
 	}
-	if cmd.BytesFlag {
-		cmd.TotalCounter.Bytes += input.Bytes
+	if cmd.bytesFlag {
+		cmd.total.bytes += input.bytes
 	}
-	if cmd.CharsFlag {
-		cmd.TotalCounter.Chars += input.Chars
+	if cmd.charsFlag {
+		cmd.total.chars += input.chars
 	}
 }
