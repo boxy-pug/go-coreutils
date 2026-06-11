@@ -33,10 +33,9 @@ Title: The Art of War
 				return strings.NewReader(testText)
 			},
 			command: command{
-				lines:         3,
-				bytes:         0,
-				useLines:      true,
-				useBytes:      false,
+				lineCount:     3,
+				byteCount:     0,
+				wantBytes:     false,
 				multipleFiles: false,
 				output:        &buf,
 			},
@@ -48,10 +47,9 @@ Title: The Art of War
 				return strings.NewReader(testText)
 			},
 			command: command{
-				lines:         0,
-				bytes:         50,
-				useLines:      false,
-				useBytes:      true,
+				lineCount:     0,
+				byteCount:     50,
+				wantBytes:     true,
 				multipleFiles: false,
 				output:        &buf,
 			},
@@ -63,10 +61,9 @@ Title: The Art of War
 				return strings.NewReader(testText)
 			},
 			command: command{
-				lines:         10,
-				bytes:         0,
-				useLines:      true,
-				useBytes:      false,
+				lineCount:     10,
+				byteCount:     0,
+				wantBytes:     false,
 				multipleFiles: false,
 				output:        &buf,
 			},
