@@ -37,4 +37,9 @@ go install github.com/boxy-pug/go-coreutils/cmd/ccuniq@latest
 
 ## What I learned
 
-_(fill me in)_
+- The `uniq` command doesn't sort the input, if you want to find duplicated lines across your input use sort -u instead. `uniq` only checks for adjacent duplicate lines.
+- That means that a map is not a good match for implementing uniq, better to do it in a single pass and always checking if line == prevLine and the count of prevLineCount as the main way to decide what to do.
+- `uniq` also only takes one input, if you provide two paths it will use the second ones as output, so like `uniq input.txt output.txt` not really matching the classic coreutils pattern.
+- For adding short and longform flags in the go flag package, just make duplicate flag entries, pointing to same variable. go/flag also doesn't care about "-" vs "--" hyphens before a flag. and as a result you cannot combine short form flags like "-cd". So that's not optimal, should prbably hand roll the flag parsing, make my own package to import, or just use external lib.
+- The cleanup func crashed when no files are opened. The fix is to initialize it as a "no-op" just empty func: func() {}.
+- For fixed width column in go formatting: ("%7d", num) -> width will always be 7 digits wide, left padded.
