@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -141,4 +143,82 @@ func TestCatCloneVsUnixCat(t *testing.T) {
 
 	}
 
+}
+
+// Unit tests for catInput
+// Uses strings.NewReader as input and bytes.Buffer as output.
+
+func TestCatInputPlain(t *testing.T) {
+	input := strings.NewReader("hello\nworld\n")
+	var buf bytes.Buffer
+	cfg := config{out: &buf}
+
+	if err := cfg.catInput(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\nworld\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCatInputNumbered(t *testing.T) {
+	input := strings.NewReader("a\n\nb\n")
+	var buf bytes.Buffer
+	cfg := config{out: &buf, numberLines: true}
+
+	if err := cfg.catInput(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "     1\ta\n     2\t\n     3\tb\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCatInputNonBlank(t *testing.T) {
+	input := strings.NewReader("a\n\nb\n")
+	var buf bytes.Buffer
+	cfg := config{out: &buf, numberNonBlank: true}
+
+	if err := cfg.catInput(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "     1\ta\n\n     2\tb\n"
+	if got := buf.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCatInputEmpty(t *testing.T) {
+	input := strings.NewReader("")
+	var buf bytes.Buffer
+	cfg := config{out: &buf, numberLines: true}
+
+	if err := cfg.catInput(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := ""
+	if got := buf.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestCatInputNoTrailingNewline(t *testing.T) {
+	input := strings.NewReader("no newline")
+	var buf bytes.Buffer
+	cfg := config{out: &buf}
+
+	if err := cfg.catInput(input); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "no newline"
+	if got := buf.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
 }
