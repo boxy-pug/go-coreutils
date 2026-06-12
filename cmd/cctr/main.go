@@ -1,3 +1,5 @@
+// cctr copies the standard input to the standard output with substitution or deletion of selected characters.
+// A kind of find and replace for individual characters.
 package main
 
 import (
@@ -14,14 +16,14 @@ const classPattern = `["]?[:](\w+)[:]["]?`
 
 type config struct {
 	input            io.Reader
-	subst            map[rune]rune
-	deleteFlag       bool
-	squeezeFlag      bool
-	target           []rune
-	translation      []rune
+	output           io.Writer
+	deleteFlag       bool          // -d delete the target
+	squeezeFlag      bool          // -s squeeze the target
+	subst            map[rune]rune // caching layer, an optimization
+	target           []rune        // the chars that tr shoudl target
+	translation      []rune        // the chars tr shoudl translate target into
 	targetType       expressionType
 	translationType  expressionType
-	output           io.Writer
 	translationSlice []rune
 	inputType        inputType
 	substFuncs
@@ -41,6 +43,7 @@ type (
 	substitutionFunc func(rune) rune
 )
 
+// substFuncs is not really needed, overcomplicates things, will simplify
 type substFuncs struct {
 	check      checkFunc
 	translate  translateFunc
@@ -50,10 +53,10 @@ type substFuncs struct {
 type inputType int
 
 const (
-	regularToRegular inputType = iota
-	regularToFunction
-	functionToRegular
-	functionToFunction
+	regToReg inputType = iota
+	regToFunc
+	funcToReg
+	funcToFunc
 )
 
 var specifierFuncMap = map[string]substFuncs{
@@ -69,21 +72,22 @@ var specifierFuncMap = map[string]substFuncs{
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Printf("couldn't load config %v", err)
+		fmt.Printf("couldn't load config %v\n", err)
 		os.Exit(1)
 	}
 
 	cfg.translateCmd()
-
-	// fmt.Println(res)
 }
 
+// loadConfig parses flags and loads the config with flags, target and translation vals.
+// Also sets default input and output and initializes the subs cache map.
 func loadConfig() (config, error) {
 	cfg := config{
 		subst:  make(map[rune]rune),
 		input:  os.Stdin,
 		output: os.Stdout,
 	}
+	cfg.subst = map[rune]rune{}
 
 	flag.BoolVar(&cfg.deleteFlag, "d", false, "delete chosen chars")
 	flag.BoolVar(&cfg.squeezeFlag, "s", false, "squeeze chosen chars")
@@ -93,21 +97,25 @@ func loadConfig() (config, error) {
 
 	switch {
 	case len(args) == 1 && (cfg.deleteFlag || cfg.squeezeFlag):
+		// if one arg and -d or -s flag, make that arg the target.
 		cfg.target = []rune(args[0])
 	case len(args) < 2:
+		// if less that two args and no flags -> error, ask for target + translation, two args
 		return cfg, fmt.Errorf("please provide chars to translate and chars to translate into: %v", args)
 	case len(args) == 2:
+		// two args: first is target, second is translation
 		cfg.target = []rune(args[0])
 		cfg.translation = []rune(args[1])
 	default:
 		return cfg, fmt.Errorf("please provide cmd <target> <translation>: %v", args)
 	}
 
+	// should validate the flags better, now what happens when d & s is true?
+	// if -d, then make the translation char empty ""
 	if cfg.deleteFlag {
 		cfg.translation = []rune("")
 		cfg.translationSlice = []rune("")
 	}
-
 	return cfg, nil
 }
 
@@ -152,13 +160,6 @@ func (cfg *config) processRunes(line string) string {
 	for scanner.Scan() {
 		currentRune := []rune(scanner.Text())[0]
 
-		// if cfg.squeezeFlag {
-		// _, exists := squeezeMap[currentRune]
-		// if exists {
-		// continue
-		// }
-		// }
-
 		// check cache first
 		cachedRune, exists := cfg.subst[currentRune]
 		if exists && cachedRune != 0 {
@@ -183,15 +184,17 @@ func (cfg *config) processRunes(line string) string {
 }
 
 func (cfg *config) checkAndLoadExpression() {
+	// wanna get rid of this, subst is initialized in loadConfig
+	// but have to fix testing first
 	if cfg.subst == nil {
 		cfg.subst = make(map[rune]rune)
 	}
 
 	switch cfg.inputType {
-	case regularToRegular:
+	case regToReg:
 		cfg.subst = loadSubstitutionMap(cfg.target, cfg.translation)
 		cfg.substitute = cfg.regToReg
-	case regularToFunction:
+	case regToFunc:
 		cfg.subst = loadSubstitutionMap(cfg.target, nil)
 
 		funcs, err := loadSubstFuncs(cfg.translation)
@@ -201,7 +204,7 @@ func (cfg *config) checkAndLoadExpression() {
 		cfg.translate = funcs.translate
 		cfg.translation = nil
 		cfg.substitute = cfg.regToFunc
-	case functionToRegular:
+	case funcToReg:
 		funcs, err := loadSubstFuncs(cfg.target)
 		if err != nil {
 			fmt.Println(err)
@@ -211,7 +214,7 @@ func (cfg *config) checkAndLoadExpression() {
 		cfg.translationSlice = []rune(cfg.translation)
 		cfg.target = nil
 		cfg.substitute = cfg.funcToReg
-	case functionToFunction:
+	case funcToFunc:
 		funcs, err := loadSubstFuncs(cfg.target)
 		if err != nil {
 			fmt.Println(err)

@@ -112,13 +112,13 @@ func loadSubstFuncs(ru []rune) (substFuncs, error) {
 func determineInputType(targT, transT expressionType) inputType {
 	switch {
 	case targT == Function && transT != Function:
-		return functionToRegular
+		return funcToReg
 	case targT != Function && transT == Function:
-		return regularToFunction
+		return regToFunc
 	case targT == Function && transT == Function:
-		return functionToFunction
+		return funcToFunc
 	default:
-		return regularToRegular
+		return regToReg
 	}
 }
 
