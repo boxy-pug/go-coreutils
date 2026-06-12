@@ -2,7 +2,7 @@
 
 ccsort sorts lines from files using multiple sorting algorithms.
 
-A Go clone of the Unix `sort` command, built for the [Build Your Own Sort Tool](https://codingchallenges.fyi/challenges/challenge-sort) challenge. I started out just making a `sort` clone, but found that this was a fun way to try out the different sorting algorithms i learned in the (Boot.dev course)[https://www.boot.dev/courses/learn-data-structures-and-algorithms-python] on algorithms, and implementing them in Go instead of Python. I also made a --test flag for running all the algos on (a copy of) the same input in parallel and timing it, to see how long the different algorithms actually take.
+A Go clone of the Unix `sort` command, built for the [Build Your Own Sort Tool](https://codingchallenges.fyi/challenges/challenge-sort) challenge. I started out just making a `sort` clone, but found that this was a fun way to try out the different sorting algorithms i learned in the [Boot.dev course](https://www.boot.dev/courses/learn-data-structures-and-algorithms-python) on algorithms, and implementing them in Go instead of Python. I also read the [Wengrow book on algorithms](https://www.amazon.com/Common-Sense-Guide-Structures-Algorithms-Second/) to understand some of this stuff better. I also made a --test flag for running all the algos on (a copy of) the same input in parallel and timing it, to see how long the different algorithms actually take.
 
 ## Usage
 
