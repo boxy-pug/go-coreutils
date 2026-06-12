@@ -1,3 +1,4 @@
+// ccsort sort lines of input text
 package main
 
 import (
@@ -14,11 +15,16 @@ func main() {
 	var duration time.Duration
 	var err error
 
-	cfg := loadConfig()
-
-	lines, err := getLines(cfg.filePaths, cfg.fromStdin)
+	cfg, cleanup, err := loadConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading file: %s", err)
+		fmt.Fprintf(os.Stderr, "loading config: %v\n", err)
+		os.Exit(1)
+	}
+	defer cleanup()
+
+	lines, err := cfg.getLines()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "reading file: %v", err)
 		os.Exit(1)
 	}
 
@@ -40,29 +46,30 @@ func main() {
 	}
 
 	if cfg.unique {
-		printUniqueLines(lines)
+		cfg.printUniqueLines(lines)
 	} else {
-		printLines(lines)
+		cfg.printLines(lines)
 	}
 
 	if cfg.verbose {
-		fmt.Fprintf(os.Stderr, "Sorting %s with %v sort algo took %v\n", cfg.filePaths, cfg.algo, duration)
+		// possible bug printing cfg.files doesnt print the names?
+		fmt.Fprintf(os.Stderr, "Sorting %v with %v sort algo took %v\n", cfg.files, cfg.algo, duration)
 	}
 }
 
-func printLines(list []string) {
+func (cfg *config) printLines(list []string) {
 	for _, line := range list {
-		fmt.Println(line)
+		fmt.Fprintln(cfg.out, line)
 	}
 }
 
-func printUniqueLines(list []string) {
+func (cfg *config) printUniqueLines(list []string) {
 	seen := make(map[string]bool)
 	for _, line := range list {
 		if seen[line] {
 			continue
 		}
-		fmt.Println(line)
+		fmt.Fprintln(cfg.out, line)
 		seen[line] = true
 	}
 }
@@ -86,7 +93,7 @@ func testAllSortingFuncs(originalList []string) {
 			dur := time.Since(start)
 
 			mu.Lock()
-			results[string(name)] = dur
+			results[name] = dur
 			mu.Unlock()
 
 		}(name, algo)
@@ -102,6 +109,7 @@ func testAllSortingFuncs(originalList []string) {
 	}
 }
 
+// helper for sorting the output of testing the algos by the time they took to execute
 func sortMapByValue(resMap map[string]time.Duration) []string {
 	resList := make([]string, 0, len(resMap))
 	for key := range resMap {
@@ -113,24 +121,11 @@ func sortMapByValue(resMap map[string]time.Duration) []string {
 	return resList
 }
 
-// getLines loads lines from stdin or files into a []string for sorting later.
-func getLines(paths []string, fromStdin bool) ([]string, error) {
-	var files []*os.File
+// getLines loads all lines from the io.Readers into a []string.
+func (cfg *config) getLines() ([]string, error) {
+	lines := []string{}
 
-	if fromStdin {
-		files = []*os.File{os.Stdin}
-	} else {
-		for _, path := range paths {
-			f, err := os.Open(path)
-			if err != nil {
-				return nil, err
-			}
-			files = append(files, f)
-		}
-	}
-
-	var lines []string
-	for _, file := range files {
+	for _, file := range cfg.files {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -138,9 +133,6 @@ func getLines(paths []string, fromStdin bool) ([]string, error) {
 		}
 		if err := scanner.Err(); err != nil {
 			return nil, fmt.Errorf("reading input: %w", err)
-		}
-		if file != os.Stdin {
-			defer file.Close()
 		}
 	}
 	return lines, nil
