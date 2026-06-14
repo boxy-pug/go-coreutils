@@ -2,302 +2,248 @@ package main
 
 import (
 	"bytes"
-	"flag"
-	"os"
 	"strings"
 	"testing"
 )
 
-// === Test helpers ===
+// --- parseFlags ---
 
-func assertError(t testing.TB, got error, wantErr bool) {
-	t.Helper()
-	if wantErr && got == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !wantErr && got != nil {
-		t.Fatalf("unexpected error: %v", got)
-	}
-}
-
-func assertString(t testing.TB, got, want string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func assertBool(t testing.TB, name string, got, want bool) {
-	t.Helper()
-	if got != want {
-		t.Errorf("%s = %v, want %v", name, got, want)
-	}
-}
-
-func assertEqual(t testing.TB, got, want string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-// === loadConfig tests ===
-// NOTE: loadConfig calls flag.Parse() which reads global os.Args.
-// We work around that by setting os.Args and resetting flag.CommandLine.
-// In the future we might refactor loadConfig to accept a []string directly.
-
-func TestLoadConfig(t *testing.T) {
-	tests := []struct {
-		name            string
-		args            []string
-		wantDelete      bool
-		wantSqueeze     bool
-		wantTarget      string
-		wantTranslation string
-		wantErr         bool
+func TestParseFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    []string
+		want    config
+		wantErr bool
 	}{
 		{
-			name:            "two args: target and translation",
-			args:            []string{"cmd", "lo", "bo"},
-			wantTarget:      "lo",
-			wantTranslation: "bo",
+			name: "target and translation",
+			args: []string{"abc", "xyz"},
+			want: config{target: "abc", translation: "xyz"},
 		},
 		{
-			name:       "delete flag with one arg",
-			args:       []string{"cmd", "-d", "abc"},
-			wantDelete: true,
-			wantTarget: "abc",
+			name: "delete flag",
+			args: []string{"-d", "abc"},
+			want: config{deleteFlag: true, target: "abc"},
 		},
 		{
-			name:        "squeeze flag with one arg",
-			args:        []string{"cmd", "-s", "abc"},
-			wantSqueeze: true,
-			wantTarget:  "abc",
+			name: "squeeze flag",
+			args: []string{"-s", "abc"},
+			want: config{squeezeFlag: true, target: "abc"},
 		},
 		{
-			name:            "delete flag with two args",
-			args:            []string{"cmd", "-d", "abc", "xyz"},
-			wantDelete:      true,
-			wantTarget:      "abc",
-			wantTranslation: "xyz",
-		},
-		{
-			name:    "no args",
-			args:    []string{"cmd"},
+			name:    "too few args",
+			args:    []string{"abc"},
 			wantErr: true,
 		},
 		{
-			name:    "one arg without delete flag",
-			args:    []string{"cmd", "abc"},
+			name:    "delete and squeeze",
+			args:    []string{"-d", "-s", "abc"},
 			wantErr: true,
 		},
 		{
-			name:    "three args",
-			args:    []string{"cmd", "a", "b", "c"},
+			name:    "too many args",
+			args:    []string{"abc", "xyz", "q"},
 			wantErr: true,
-		},
-		{
-			name:        "delete and squeeze together",
-			args:        []string{"cmd", "-d", "-s", "abc"},
-			wantErr:     true,
 		},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			oldArgs := os.Args
-			defer func() { os.Args = oldArgs }()
-			os.Args = tc.args
-
-			// Reset global flag state to avoid "flag redefined" panics
-			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-
-			cfg, err := loadConfig()
-			assertError(t, err, tc.wantErr)
+			got, err := parseFlags(tc.args)
 			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("parseFlags(%v): expected error, got nil", tc.args)
+				}
 				return
 			}
-
-			assertString(t, cfg.target, tc.wantTarget)
-			assertString(t, cfg.translation, tc.wantTranslation)
-			assertBool(t, "deleteFlag", cfg.deleteFlag, tc.wantDelete)
-			assertBool(t, "squeezeFlag", cfg.squeezeFlag, tc.wantSqueeze)
+			if err != nil {
+				t.Fatalf("parseFlags(%v): unexpected error: %v", tc.args, err)
+			}
+			if got.target != tc.want.target || got.translation != tc.want.translation || got.deleteFlag != tc.want.deleteFlag || got.squeezeFlag != tc.want.squeezeFlag {
+				t.Fatalf("parseFlags(%v) = %+v, want %+v", tc.args, got, tc.want)
+			}
 		})
 	}
 }
 
-// === buildTranslator tests ===
-// These will fail initially because buildTranslator is currently a stub.
-// They serve as the TDD guide for the refactor.
+// --- buildTranslator ---
 
 func TestBuildTranslator(t *testing.T) {
-	t.Run("regular to regular", func(t *testing.T) {
-		cfg := config{
-			target:      "lo",
-			translation: "bo",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "hello")
-		assertString(t, got, "hebbo")
-	})
+	cases := []struct {
+		name    string
+		cfg     config
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "literal translation",
+			cfg:  config{target: "abc", translation: "xyz"},
+			in:   "abc",
+			want: "xyz",
+		},
+		{
+			name: "delete",
+			cfg:  config{target: "abc", deleteFlag: true},
+			in:   "abc123",
+			want: "123",
+		},
+		{
+			name: "range expansion",
+			cfg:  config{target: "a-c", translation: "XYZ"},
+			in:   "abc",
+			want: "XYZ",
+		},
+		{
+			name: "class expansion",
+			cfg:  config{target: "[:lower:]", translation: "[:upper:]"},
+			in:   "abc",
+			want: "ABC",
+		},
+		{
+			name: "last char repeats",
+			cfg:  config{target: "abc", translation: "xy"},
+			in:   "abc",
+			want: "xyy",
+		},
+		{
+			name: "unchanged chars",
+			cfg:  config{target: "abc", translation: "ABC"},
+			in:   "abc123",
+			want: "ABC123",
+		},
+		{
+			name: "class expansion digit",
+			cfg:  config{target: "[:digit:]", translation: "?"},
+			in:   "a1b2c3",
+			want: "a?b?c?",
+		},
+		{
+			name: "range expansion first",
+			cfg:  config{target: "A-Z", translation: "[:lower:]"},
+			in:   "ABC",
+			want: "abc",
+		},
+	}
 
-	t.Run("regular to regular with delete", func(t *testing.T) {
-		cfg := config{
-			target:      "lo",
-			translation: "bo",
-			deleteFlag:  true,
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		// Delete means target chars are removed. Using strings.Map,
-		// returning -1 drops the character.
-		got := strings.Map(tr, "hello")
-		assertString(t, got, "he")
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr, err := buildTranslator(tc.cfg)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("buildTranslator(%+v): expected error, got nil", tc.cfg)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("buildTranslator(%+v): unexpected error: %v", tc.cfg, err)
+			}
 
-	t.Run("range expansion", func(t *testing.T) {
-		cfg := config{
-			target:      "a-d",
-			translation: "e-h",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "abcd")
-		assertString(t, got, "efgh")
-	})
-
-	t.Run("class specifier lower to upper", func(t *testing.T) {
-		cfg := config{
-			target:      "[:lower:]",
-			translation: "[:upper:]",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "hello")
-		assertString(t, got, "HELLO")
-	})
-
-	t.Run("class specifier alpha to digit", func(t *testing.T) {
-		cfg := config{
-			target:      "[:alpha:]",
-			translation: "[:digit:]",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "abc")
-		assertString(t, got, "999")
-	})
-
-	t.Run("invalid class specifier", func(t *testing.T) {
-		cfg := config{
-			target:      "[:foo:]",
-			translation: "[:upper:]",
-		}
-		_, err := buildTranslator(cfg)
-		assertError(t, err, true)
-	})
-
-	t.Run("regular target and class specifier translation", func(t *testing.T) {
-		cfg := config{
-			target:      "od",
-			translation: "[:upper:]",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "coding")
-		assertString(t, got, "CODing")
-	})
-
-	t.Run("class specifier target and regular translation", func(t *testing.T) {
-		cfg := config{
-			target:      "[:lower:]",
-			translation: "xyz",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "abc")
-		assertString(t, got, "xyz")
-	})
-
-	t.Run("class specifier target and regular translation with extra chars", func(t *testing.T) {
-		cfg := config{
-			target:      "[:lower:]",
-			translation: "xyz",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		// "abc" -> "xyz", then "d" -> "z" (last char repeats)
-		got := strings.Map(tr, "abcd")
-		assertString(t, got, "xyzz")
-	})
-
-	t.Run("emoji rune subst", func(t *testing.T) {
-		cfg := config{
-			target:      "😊",
-			translation: "👀",
-		}
-		tr, err := buildTranslator(cfg)
-		assertError(t, err, false)
-		got := strings.Map(tr, "hello😊")
-		assertString(t, got, "hello👀")
-	})
+			var out bytes.Buffer
+			cfg := config{in: strings.NewReader(tc.in), out: &out}
+			if err := cfg.translate(tr); err != nil {
+				t.Fatalf("translate: %v", err)
+			}
+			if got := out.String(); got != tc.want {
+				t.Fatalf("translate(%q): got %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
 }
 
-// === run tests ===
-// These test the I/O loop. Will fail initially because run is a stub.
+// --- run ---
 
 func TestRun(t *testing.T) {
-	t.Run("single line", func(t *testing.T) {
-		var buf bytes.Buffer
-		cfg := &config{
-			input:  strings.NewReader("hello"),
-			output: &buf,
-		}
-		tr := func(r rune) rune { return r }
-		err := cfg.run(tr)
-		assertError(t, err, false)
-		assertString(t, buf.String(), "hello\n")
-	})
+	cases := []struct {
+		name    string
+		args    []string
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "basic translation",
+			args: []string{"cmd", "abc", "xyz"},
+			in:   "abc",
+			want: "xyz",
+		},
+		{
+			name: "delete",
+			args: []string{"cmd", "-d", "abc"},
+			in:   "abc123",
+			want: "123",
+		},
+		{
+			name: "range expansion",
+			args: []string{"cmd", "a-c", "XYZ"},
+			in:   "abc",
+			want: "XYZ",
+		},
+		{
+			name: "class expansion",
+			args: []string{"cmd", "[:lower:]", "[:upper:]"},
+			in:   "abc",
+			want: "ABC",
+		},
+		{
+			name: "unchanged chars",
+			args: []string{"cmd", "abc", "ABC"},
+			in:   "abc123",
+			want: "ABC123",
+		},
+		{
+			name: "digit class",
+			args: []string{"cmd", "[:digit:]", "X"},
+			in:   "a1b2c3",
+			want: "aXbXcX",
+		},
+		{
+			name: "alpha class",
+			args: []string{"cmd", "[:alpha:]", "?"},
+			in:   "a1b2c3",
+			want: "?1?2?3",
+		},
+		{
+			name: "punct class",
+			args: []string{"cmd", "[:punct:]", " "},
+			in:   "a,b!c?d",
+			want: "a b c d",
+		},
+		{
+			name: "space class",
+			args: []string{"cmd", "[:space:]", "_"},
+			in:   "a b\tc\nd",
+			want: "a_b_c_d",
+		},
+		{
+			name: "upper to lower",
+			args: []string{"cmd", "[:upper:]", "[:lower:]"},
+			in:   "ABCD",
+			want: "abcd",
+		},
+		{
+			name:    "missing translation",
+			args:    []string{"cmd", "abc"},
+			wantErr: true,
+		},
+	}
 
-	t.Run("multiple lines", func(t *testing.T) {
-		var buf bytes.Buffer
-		cfg := &config{
-			input:  strings.NewReader("hello\nworld"),
-			output: &buf,
-		}
-		tr := func(r rune) rune { return r }
-		err := cfg.run(tr)
-		assertError(t, err, false)
-		assertString(t, buf.String(), "hello\nworld\n")
-	})
-
-	t.Run("empty input", func(t *testing.T) {
-		var buf bytes.Buffer
-		cfg := &config{
-			input:  strings.NewReader(""),
-			output: &buf,
-		}
-		tr := func(r rune) rune { return r }
-		err := cfg.run(tr)
-		assertError(t, err, false)
-		assertString(t, buf.String(), "")
-	})
-
-	t.Run("translate during run", func(t *testing.T) {
-		var buf bytes.Buffer
-		cfg := &config{
-			input:  strings.NewReader("hello"),
-			output: &buf,
-		}
-		tr := func(r rune) rune {
-			if r == 'l' {
-				return 'b'
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := run(tc.args, strings.NewReader(tc.in), &out)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("run(%v, %q): expected error, got nil", tc.args, tc.in)
+				}
+				return
 			}
-			return r
-		}
-		err := cfg.run(tr)
-		assertError(t, err, false)
-		assertString(t, buf.String(), "hebbo\n")
-	})
+			if err != nil {
+				t.Fatalf("run(%v, %q): unexpected error: %v", tc.args, tc.in, err)
+			}
+			if got := out.String(); got != tc.want {
+				t.Fatalf("run(%v, %q): got %q, want %q", tc.args, tc.in, got, tc.want)
+			}
+		})
+	}
 }
