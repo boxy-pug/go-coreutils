@@ -13,15 +13,7 @@ import (
 )
 
 // classPattern matches "[:word:]" (quotes are optional), captures word.
-// ^            - Start of string
-// ["]?         - Optional opening quote (matches " if present)
-// \[           - Literal opening bracket [ (escaped because [ is a regex metacharacter)
-// :            - Literal colon : (start of class specifier)
-// (\w+)        - Capture group 1: the class name (word characters only: a-z, A-Z, 0-9, _)
-// :            - Literal colon : (end of class specifier)
-// \]           - Literal closing bracket ] (escaped because ] is a regex metacharacter)
-// ["]?         - Optional closing quote (matches " if present)
-// $            - End of string
+// ["]?         - Optional opening quote (matches " if present), dont know it its needed?
 var classPattern = regexp.MustCompile(`^["]?\[:(\w+):\]["]?$`)
 
 type config struct {
@@ -33,10 +25,8 @@ type config struct {
 	translation string // the chars tr shoudl translate target into
 }
 
-// This implementation supports ascii only, if not the class -> literal is hard to pull of
-// Example : tr [:print:] 123 that class would expand to a lot off chars, and you have to map them all, like
-// map first printable char " " -> 1, map second printable "!" -> 2 etc. Fine for ascii but weird for unicode.
-var asciiAlpha = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") // Alpha is all lower and uppercase letters
+// This implementation supports ascii only.
+var asciiAlpha = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 var asciiUpper = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 var asciiLower = []rune("abcdefghijklmnopqrstuvwxyz")
 var asciiDigit = []rune("0123456789")
@@ -140,13 +130,13 @@ func parseFlags(args []string) (config, error) {
 }
 
 // expandExpression takes a string and evaluates if its a regular,
-// range or function specifier, and expands it to a []rune.
+// range or class specifier, and expands it to a []rune. Also returns an exprKind
+// which describes what kind of expression it is.
 func expandExpression(s string) ([]rune, exprKind, error) {
 	var chars []rune
 
-	// Handle function expression
+	// Handle class specifier expression
 	matches := classPattern.FindStringSubmatch(s)
-	// fmt.Printf("match found for %s: %s", matches[0], matches[1])
 	// matches is nil if no match
 	// matches[0] is the full match, matches[1] os capture group
 	if matches != nil {
@@ -172,23 +162,27 @@ func expandExpression(s string) ([]rune, exprKind, error) {
 
 	// Handle range expression
 	// simplified for now, only support one '-' in range
+	// if the expression starts or ends with '-' its interpreted as regular
 	parts := strings.Split(s, "-")
 	// If there's something before and after the - we treat it as real range
 	if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
 		first, last := []rune(parts[0]), []rune(parts[1])
-		// Append first part minus last char to chars
-		chars = append(chars, first[:len(first)-1]...)
+		// Append first part, everything before '-'
+		chars = append(chars, first...)
 
-		// We want to add any char from end of first up to
-		// but not including first of last.
+		// We want to add any char from the rune after the last in first
+		// up until but not including first of last.
 		// Rune is just an int, so we can increment like this
 		r := first[len(first)-1]
+		r++ // increment to next rune from
 		endRune := last[0]
 
 		for r < endRune {
 			chars = append(chars, r)
 			r++
 		}
+
+		// add the last part the chars after '-'
 		chars = append(chars, last...)
 
 		return chars, exprRegular, nil
@@ -262,9 +256,10 @@ func buildTranslator(cfg config) (func(rune) rune, error) {
 	}, nil
 }
 
+// isValidExprCombo takes a target and translation exprKind, and evaluates whether it's
+// a valid combination. All class specifiers in the translation position is illegal except the
+// four possible combos of upper and lower.
 func isValidExprCombo(targetExpr, transExpr exprKind) (bool, error) {
-	// All class specifiers in th translation position is illegal except the
-	// four possible combos of upper and lower.
 	switch transExpr {
 	case exprUpper, exprLower:
 		if targetExpr == exprUpper || targetExpr == exprLower {
@@ -279,6 +274,9 @@ func isValidExprCombo(targetExpr, transExpr exprKind) (bool, error) {
 	}
 }
 
+// translate reads the input rune by rune, and sends each rune through the supplied
+// translate function before writing the result to Stdout. Handles squeeze and delete
+// by interpreting rune -1 and -2 as sentinel values.
 func (cfg *config) translate(tr func(rune) rune) error {
 	// Wrap output in buffered writer, gives you WriteRune()
 	writer := bufio.NewWriter(cfg.out)
@@ -287,6 +285,7 @@ func (cfg *config) translate(tr func(rune) rune) error {
 	reader := bufio.NewReader(cfg.in)
 
 	var prevRune rune
+	hasPrev := false // needed to track if were on first rune of input
 
 	// read one rune at a time, look it up in translator map
 	// if it's a squeeze: -2 decide wether to skip it
@@ -306,7 +305,7 @@ func (cfg *config) translate(tr func(rune) rune) error {
 		if translated == -2 {
 			// if r is same as prevRune squeeze it by marking it as -1 for delete
 			// compare against original rune bcs in the map theres a sentinel val -2
-			if r == prevRune {
+			if r == prevRune && hasPrev {
 				translated = -1
 				// if this is the first occurence, print the original rune
 			} else {
@@ -322,6 +321,7 @@ func (cfg *config) translate(tr func(rune) rune) error {
 			return err
 		}
 		prevRune = r // set current rune to prevRune
+		hasPrev = true
 	}
 	// return the flush error, if writer failed (disk full etc) we want to know.
 	return writer.Flush()

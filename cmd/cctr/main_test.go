@@ -55,6 +55,16 @@ func TestParseFlags(t *testing.T) {
 			args:    []string{"-s", "abc", "xyz"},
 			wantErr: true,
 		},
+		{
+			name:    "delete with no target",
+			args:    []string{"-d"},
+			wantErr: true,
+		},
+		{
+			name:    "squeeze with no target",
+			args:    []string{"-s"},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -155,16 +165,16 @@ func TestBuildTranslator(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "upper to lower class: valid case conversion",
-			cfg:     config{target: "[:upper:]", translation: "[:lower:]"},
-			in:      "ABC",
-			want:    "abc",
+			name: "upper to lower class: valid case conversion",
+			cfg:  config{target: "[:upper:]", translation: "[:lower:]"},
+			in:   "ABC",
+			want: "abc",
 		},
 		{
-			name:    "lower to lower class: valid no-op",
-			cfg:     config{target: "[:lower:]", translation: "[:lower:]"},
-			in:      "abc",
-			want:    "abc",
+			name: "lower to lower class: valid no-op",
+			cfg:  config{target: "[:lower:]", translation: "[:lower:]"},
+			in:   "abc",
+			want: "abc",
 		},
 		{
 			name: "empty target delete",
@@ -194,6 +204,27 @@ func TestBuildTranslator(t *testing.T) {
 			name:    "non-empty target with empty translation",
 			cfg:     config{target: "abc", translation: ""},
 			wantErr: true,
+		},
+		// Reverse range: z-a should expand to the chars before and after '-', no range expansion, and hyphen itself not added.
+		{
+			name: "reverse range c-a",
+			cfg:  config{target: "c-a", translation: "x"},
+			in:   "abc-",
+			want: "xbx-",
+		},
+		// NUL byte should be translatable like any other rune
+		{
+			name: "translate NUL byte",
+			cfg:  config{target: "\x00", translation: "x"},
+			in:   "\x00",
+			want: "x",
+		},
+		// Control char range: tab (9) to space (32) should expand to all chars in between
+		{
+			name: "control char range tab to space",
+			cfg:  config{target: "\t- ", translation: "x"},
+			in:   "\t",
+			want: "x",
 		},
 	}
 
@@ -297,7 +328,6 @@ func TestRun(t *testing.T) {
 			args:    []string{"cmd", "abc"},
 			wantErr: true,
 		},
-		// Misalignment errors: these should fail until we add validation
 		{
 			name:    "alpha to upper class: invalid",
 			args:    []string{"cmd", "[:alpha:]", "[:upper:]"},
@@ -318,7 +348,6 @@ func TestRun(t *testing.T) {
 			args:    []string{"cmd", "b", "[:upper:]"},
 			wantErr: true,
 		},
-		// Squeeze tests: will fail until squeeze is implemented
 		{
 			name: "squeeze one char",
 			args: []string{"cmd", "-s", "o"},
@@ -343,8 +372,6 @@ func TestRun(t *testing.T) {
 			in:   "aaXXbb",
 			want: "aXXb",
 		},
-		// Edge cases
-		// BUG: empty translation causes panic in buildTranslator (translation[len(translation)-1])
 		{
 			name:    "non-empty target with empty translation",
 			args:    []string{"cmd", "abc", ""},
@@ -621,6 +648,86 @@ func TestRun(t *testing.T) {
 			args: []string{"cmd", "-s", "a"},
 			in:   "aaa",
 			want: "a",
+		},
+		// NUL byte edge cases: prevRune is initialized to 0, so if the first char
+		// in the input is also 0 (NUL byte), squeeze mode incorrectly squeezes it.
+		// This exposes the prevRune bug.
+		{
+			name: "squeeze NUL byte",
+			args: []string{"cmd", "-s", "\x00"},
+			in:   "\x00",
+			want: "\x00",
+		},
+		{
+			name: "squeeze NUL byte multiple",
+			args: []string{"cmd", "-s", "\x00"},
+			in:   "\x00\x00\x00",
+			want: "\x00",
+		},
+		// NUL byte should translate fine since it's just another rune
+		{
+			name: "translate NUL byte",
+			args: []string{"cmd", "\x00", "x"},
+			in:   "\x00",
+			want: "x",
+		},
+		// Unicode should pass through untouched if not in the target set
+		{
+			name: "unicode pass through",
+			args: []string{"cmd", "abc", "xyz"},
+			in:   "😀",
+			want: "😀",
+		},
+		// Unicode should work as a target character too
+		{
+			name: "unicode as target",
+			args: []string{"cmd", "😀", "x"},
+			in:   "😀",
+			want: "x",
+		},
+		// Single dash should be treated as literal, not a range
+		{
+			name: "single dash literal",
+			args: []string{"cmd", "-", "x"},
+			in:   "a-b",
+			want: "axb",
+		},
+		// Multiple dashes should be treated as literal, not multiple ranges.
+		// Target "a-b-c" is 5 chars: a,-,b,-,c. Translation "xyz" is 3 chars.
+		// Last char repeats, so - maps to z (the 3rd char), and c also maps to z.
+		// Also the second '-' overwrites the first '-' in the map. Result: "xzz"
+		{
+			name: "multiple dashes literal",
+			args: []string{"cmd", "a-b-c", "xyz"},
+			in:   "abc",
+			want: "xzz",
+		},
+		// Squeeze where the target char is not at the start of the input
+		{
+			name: "squeeze char not at start",
+			args: []string{"cmd", "-s", "a"},
+			in:   "baaa",
+			want: "ba",
+		},
+		// Squeeze with multiple runs of the same char
+		{
+			name: "squeeze char multiple runs",
+			args: []string{"cmd", "-s", "a"},
+			in:   "aaabaaa",
+			want: "aba",
+		},
+		// parseFlags edge cases: no target after delete/squeeze
+		{
+			name:    "delete with no target",
+			args:    []string{"cmd", "-d"},
+			in:      "abc",
+			wantErr: true,
+		},
+		{
+			name:    "squeeze with no target",
+			args:    []string{"cmd", "-s"},
+			in:      "abc",
+			wantErr: true,
 		},
 	}
 
