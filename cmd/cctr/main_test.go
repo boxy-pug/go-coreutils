@@ -119,10 +119,42 @@ func TestBuildTranslator(t *testing.T) {
 			want: "a?b?c?",
 		},
 		{
-			name: "range expansion first",
-			cfg:  config{target: "A-Z", translation: "[:lower:]"},
-			in:   "ABC",
-			want: "abc",
+			name:    "range expansion first",
+			cfg:     config{target: "A-Z", translation: "[:lower:]"},
+			wantErr: true,
+		},
+		// Misalignment errors: these should fail until we add validation
+		{
+			name:    "alpha to upper: invalid class in string2",
+			cfg:     config{target: "[:alpha:]", translation: "[:upper:]"},
+			wantErr: true,
+		},
+		{
+			name:    "digit to lower: invalid class in string2",
+			cfg:     config{target: "[:digit:]", translation: "[:lower:]"},
+			wantErr: true,
+		},
+		{
+			name:    "lower to digit: invalid class in string2",
+			cfg:     config{target: "[:lower:]", translation: "[:digit:]"},
+			wantErr: true,
+		},
+		{
+			name:    "literal to upper: misaligned",
+			cfg:     config{target: "b", translation: "[:upper:]"},
+			wantErr: true,
+		},
+		{
+			name:    "upper to lower class: valid case conversion",
+			cfg:     config{target: "[:upper:]", translation: "[:lower:]"},
+			in:      "ABC",
+			want:    "abc",
+		},
+		{
+			name:    "lower to lower class: valid no-op",
+			cfg:     config{target: "[:lower:]", translation: "[:lower:]"},
+			in:      "abc",
+			want:    "abc",
 		},
 	}
 
@@ -225,6 +257,52 @@ func TestRun(t *testing.T) {
 			name:    "missing translation",
 			args:    []string{"cmd", "abc"},
 			wantErr: true,
+		},
+		// Misalignment errors: these should fail until we add validation
+		{
+			name:    "alpha to upper class: invalid",
+			args:    []string{"cmd", "[:alpha:]", "[:upper:]"},
+			wantErr: true,
+		},
+		{
+			name:    "digit to lower class: invalid",
+			args:    []string{"cmd", "[:digit:]", "[:lower:]"},
+			wantErr: true,
+		},
+		{
+			name:    "lower to digit class: invalid",
+			args:    []string{"cmd", "[:lower:]", "[:digit:]"},
+			wantErr: true,
+		},
+		{
+			name:    "literal to upper class: misaligned",
+			args:    []string{"cmd", "b", "[:upper:]"},
+			wantErr: true,
+		},
+		// Squeeze tests: will fail until squeeze is implemented
+		{
+			name: "squeeze one char",
+			args: []string{"cmd", "-s", "o"},
+			in:   "helloooo",
+			want: "hello",
+		},
+		{
+			name: "squeeze set",
+			args: []string{"cmd", "-s", "abc"},
+			in:   "aaabbbccc",
+			want: "abc",
+		},
+		{
+			name: "squeeze mixed chars",
+			args: []string{"cmd", "-s", "lo"},
+			in:   "hello",
+			want: "helo",
+		},
+		{
+			name: "squeeze leaves non-target chars alone",
+			args: []string{"cmd", "-s", "ab"},
+			in:   "aaXXbb",
+			want: "aXXb",
 		},
 	}
 

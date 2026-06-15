@@ -44,15 +44,21 @@ var asciiPrint = []rune(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTU
 var asciiPunct = []rune("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
 var asciiSpace = []rune("\t\n\v\f\r ") // tab 9, newline 10, vertical tab 11, formfeed 12, carriage return 13, space 32
 
-// var specifierFuncMap = map[string]substFuncs{
-// 	"alpha": {check: unicode.IsLetter, translate: ToLetter},
-// 	"upper": {check: unicode.IsUpper, translate: unicode.ToUpper},
-// 	"lower": {check: unicode.IsLower, translate: unicode.ToLower},
-// 	"digit": {check: unicode.IsDigit, translate: ToDigit},
-// 	"print": {check: unicode.IsPrint, translate: ToPrint},
-// 	"punct": {check: unicode.IsPunct, translate: ToPunct},
-// 	"space": {check: unicode.IsSpace, translate: ToSpace},
-// }
+type exprKind string
+
+const (
+	exprRegular exprKind = "regular"
+	exprDelete  exprKind = "delete"
+	exprSqueeze exprKind = "squeeze"
+	exprAlpha   exprKind = "alpha"
+	exprUpper   exprKind = "upper"
+	exprLower   exprKind = "lower"
+	exprDigit   exprKind = "digit"
+	exprPrint   exprKind = "print"
+	exprPunct   exprKind = "punct"
+	exprSpace   exprKind = "space"
+	exprUnknown exprKind = "unknown"
+)
 
 // main is a thin wrapper around run(), for easier integration testing.
 func main() {
@@ -71,13 +77,13 @@ func run(args []string, in io.Reader, out io.Writer) error {
 		return fmt.Errorf("parsing %v as flags: %v", args[1:], err)
 	}
 
-	cfg.in = in
-	cfg.out = out
-
 	tr, err := buildTranslator(cfg)
 	if err != nil {
 		return fmt.Errorf("building translator: %v\n", err)
 	}
+
+	cfg.in = in
+	cfg.out = out
 
 	// translate returns an error, and so does run, so this works.
 	return cfg.translate(tr)
@@ -123,7 +129,7 @@ func parseFlags(args []string) (config, error) {
 
 // expandExpression takes a string and evaluates if its a regular,
 // range or function specifier, and expands it to a []rune.
-func expandExpression(s string) ([]rune, error) {
+func expandExpression(s string) ([]rune, exprKind, error) {
 	var chars []rune
 
 	// Handle function expression
@@ -134,21 +140,21 @@ func expandExpression(s string) ([]rune, error) {
 	if matches != nil {
 		switch matches[1] {
 		case "alpha":
-			return asciiAlpha, nil
+			return asciiAlpha, exprAlpha, nil
 		case "upper":
-			return asciiUpper, nil
+			return asciiUpper, exprUpper, nil
 		case "lower":
-			return asciiLower, nil
+			return asciiLower, exprLower, nil
 		case "digit":
-			return asciiDigit, nil
+			return asciiDigit, exprDigit, nil
 		case "print":
-			return asciiPrint, nil
+			return asciiPrint, exprPrint, nil
 		case "punct":
-			return asciiPunct, nil
+			return asciiPunct, exprPunct, nil
 		case "space":
-			return asciiSpace, nil
+			return asciiSpace, exprSpace, nil
 		default:
-			return []rune{}, fmt.Errorf("%q doesnt match any class specifier", matches[1])
+			return []rune{}, exprUnknown, fmt.Errorf("%q doesnt match any class specifier", matches[1])
 		}
 	}
 
@@ -173,31 +179,47 @@ func expandExpression(s string) ([]rune, error) {
 		}
 		chars = append(chars, last...)
 
-		return chars, nil
+		return chars, exprRegular, nil
 	}
 
 	// Handle regular
-	return []rune(s), nil
+	return []rune(s), exprRegular, nil
 }
 
 // buildTranslator uses args classifies expressions, expands ranges, loads functions and returns a func(rune) rune
 func buildTranslator(cfg config) (func(rune) rune, error) {
 
 	// expand target
-	target, err := expandExpression(cfg.target)
+	target, targetExprKind, err := expandExpression(cfg.target)
 	if err != nil {
 		return nil, fmt.Errorf("expanding target expression %q: %w", cfg.target, err)
 	}
 
 	// expanding translation, if deleteFlag then it should just contain -1
 	var translation []rune
+	var translationExprKind exprKind
+
 	if cfg.deleteFlag {
 		translation = []rune{-1}
+		translationExprKind = exprDelete
+	} else if cfg.squeezeFlag {
+		translation = []rune{-2}
+		translationExprKind = exprSqueeze
 	} else {
-		translation, err = expandExpression(cfg.translation)
+		translation, translationExprKind, err = expandExpression(cfg.translation)
 		if err != nil {
 			return nil, fmt.Errorf("expanding translation expression %q: %w", cfg.translation, err)
 		}
+	}
+
+	// handle invalid class expression combinations
+	isValidCombination, err := isValidExprCombo(targetExprKind, translationExprKind)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isValidCombination {
+		return nil, fmt.Errorf("expanding translation: %w", err)
 	}
 
 	trMap := make(map[rune]rune)
@@ -218,12 +240,31 @@ func buildTranslator(cfg config) (func(rune) rune, error) {
 	}, nil
 }
 
+func isValidExprCombo(targetExpr, transExpr exprKind) (bool, error) {
+	// All class specifiers in th translation position is illegal except the
+	// four possible combos of upper and lower.
+	switch transExpr {
+	case exprUpper, exprLower:
+		if targetExpr == exprUpper || targetExpr == exprLower {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("misaligned or invalid class: %q, %q", targetExpr, transExpr)
+		}
+	case exprAlpha, exprDigit, exprPrint, exprPunct, exprSpace:
+		return false, fmt.Errorf("misaligned or invalid class: %q, %q", targetExpr, transExpr)
+	default:
+		return true, nil
+	}
+}
+
 func (cfg *config) translate(tr func(rune) rune) error {
 	// Wrap output in buffered writer, gives you WriteRune()
 	writer := bufio.NewWriter(cfg.out)
 	defer writer.Flush() // Fluesh the buffer, even on unexpected errors
 
 	reader := bufio.NewReader(cfg.in)
+
+	var prevRune rune
 
 	for {
 		r, _, err := reader.ReadRune()
@@ -234,12 +275,26 @@ func (cfg *config) translate(tr func(rune) rune) error {
 			return err
 		}
 		translated := tr(r)
-		// -1 means deleted char
-		if translated != -1 {
-			if _, err := writer.WriteRune(translated); err != nil {
-				return err
+
+		// if translated is -2 that means r shoudl be squeezed
+		if translated == -2 {
+			// if r is same as prevRune squeeze it by marking it as -1 for delete
+			if r == prevRune {
+				translated = -1
+				// if this is the first occurence, print the original rune
+			} else {
+				translated = r
 			}
 		}
+		// if -1 for delete
+		if translated == -1 {
+			continue
+		}
+		// else write the translated rune
+		if _, err := writer.WriteRune(translated); err != nil {
+			return err
+		}
+		prevRune = r // set current rune to prevRune
 	}
 	// return the flush error, if writer failed (disk full etc) we want to know.
 	return writer.Flush()

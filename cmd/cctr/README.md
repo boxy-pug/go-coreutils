@@ -37,69 +37,45 @@ go install github.com/boxy-pug/go-coreutils/cmd/cctr@latest
 - Three kinds of expressions:
   - Regular "abc": matches those three chars
   - Range "a-d": matches abcd (basically just syntactic sugar for regular)
-  - Function class specifier like "[:lower:]", matches all lowercase letters (semantic, doesnt just expand to a list of chars)
+  - Function class specifier like "[:lower:]", matches all lowercase letters
 - So there are 4 translation modes, translating to and from Regular (including range) and Function:
   - reg -> reg: build a map that maps targets to translations, easy
   - reg -> func: build a map for targets, when char in amp run the func on it
   - func -> reg: trickiest one. when matching the func (like "[:lower:]") then replace by translation chars, one by one. The last one repeats when your out of translation chars.
   - func -> func: if it matches target func (like "[:lower:]"), run it through translation func like "[:upper:]" for example, for translating all lowercase to uppercase
-  - While refactoring I kind of understood that there's a simpler pattern i could use for these tools, to allow for better/easier testing. Basically: use main() as a thin wrapper around a run() function. So run() becomes the new main, kindof. In main you have an err := run(os.Args, io.Reader, io.Writer), and that makes for really simple integration testing. Then inside run you can have separate more or less pure functions that you can unit test, so like cfg = parseFlags(args[1:]), buildTranslator(cfg), translate(cfg, tr) for example. So then you dont have to hack around with os.Args and stuff in tests.
-  - So the basic insight: main is kindof an impure shell, that binds to the real world with os.args and in and out. when making a run function that can be a neat testable boundary. everything inside there can be pure funcs, so f ex: Instead of parsing os.Args, you're parsing a []string.
+- I'm leaving this comments in for now, but actually I understood that there is a simpler way of thinking about this, and that's how tr works: The class specifiers just expand to a regular literal set of chars, they are not "functions" or special in any way, only diff is that its restricted what class specifiers you can put in string2/translation string.
+- While refactoring I kind of understood that there's a simpler pattern i could use for these tools, to allow for better/easier testing. Basically: use main() as a thin wrapper around a run() function. So run() becomes the new main, kindof. In main you have an err := run(os.Args, io.Reader, io.Writer), and that makes for really simple integration testing. Then inside run you can have separate more or less pure functions that you can unit test, so like cfg = parseFlags(args[1:]), buildTranslator(cfg), translate(cfg, tr) for example. So then you dont have to hack around with os.Args and stuff in tests.
+- So the basic insight: main is kindof an impure shell, that binds to the real world with os.args and in and out. when making a run function that can be a neat testable boundary. everything inside there can be pure funcs, so f ex: Instead of parsing os.Args, you're parsing a []string.
 
-## Current behavior vs real `tr` spec
+## tr spec, how it works
 
-### What works now
+So the basic idea is: you give `tr` a set of characters to look for (string1/target) and a set of characters to replace them with (string2/translation). Then it walks through the input and goes "is this char in my target set? if so, replace it with the corresponding char from the translation set."
 
-- **string1 (target):** all classes expand to **literal ASCII sets**
-  - `[:lower:]` → `abcdefghijklmnopqrstuvwxyz`
-  - `[:upper:]` → `ABCDEFGHIJKLMNOPQRSTUVWXYZ`
-  - `[:alpha:]`, `[:digit:]`, `[:print:]`, `[:punct:]`, `[:space:]` → their ASCII chars
-  - Range expansion: `a-c` → `abc`, `A-Z` → `ABCDEFGHIJKLMNOPQRSTUVWXYZ`
-- **string2 (translation):** also treated as literal sets (same expansion rules)
-  - This means `tr '[:lower:]' '[:upper:]'` happens to work because the sets are the same size
-  - But it's not doing real case conversion — it's mapping `a→A`, `b→B`, etc. by position
-- **Delete (`-d`):** one string, all classes are literal sets, `-1` sentinel deletes
+If the target is longer than the translation, the last char of the translation just repeats. So `tr 'abcd' 'xy'` gives you a→x, b→y, c→y, d→y.
 
-### What real `tr` does (and what we need to match)
+**Expressions** — `tr` recognizes three kinds of things in its strings:
 
-**Translation (two strings, no `-d`):**
-- string1: all classes are literal sets (same as us)
-- string2: **only `[:lower:]` and `[:upper:]` are allowed**
-  - These are **case conversion functions**, not literal sets
-  - They must appear in the same relative position as their counterpart in string1
-  - `tr '[:lower:]' '[:upper:]'` → lowercase chars become uppercase via `unicode.ToUpper`
-  - `tr '[:upper:]' '[:lower:]'` → uppercase chars become lowercase via `unicode.ToLower`
-  - `tr '[:lower:][:upper:]' '[:upper:][:lower:]'` → swap case
-  - Any other class in string2 (`[:digit:]`, `[:alpha:]`, etc.) → **error**
-  - Literal target with `[:upper:]`/`[:lower:]` in string2 → **error**
-  - e.g., `tr 'abc' '[:upper:]'` → "misaligned" error
+- **Literal strings** like `abc` — just those three chars
+- **Ranges** like `a-z` — shorthand for all lowercase letters
+- **Class specifiers** like `[:lower:]` — these expand to predefined sets of chars
 
-**Delete (`-d`):**
-- One string only. All classes are literal sets. (same as us)
+I support these classifiers: `[:lower:]`, `[:upper:]`, `[:alpha:]`, `[:digit:]`, `[:print:]`, `[:punct:]`, `[:space:]`. They just expand to a set of chars, so writing `[:digit:]` is exactly the same as writing `0123456789`
 
-**Squeeze (`-s`):**
-- One string only. Replaces N consecutive identical chars with 1.
-- `tr -s 'abc'` → squeeze a, b, or c
-- `tr -s 'abc' 'xyz'` → squeeze a→x, b→y, c→z
+`tr` is strict about what classes you can put in the second/translation string. Only `[:upper:]` and `[:lower:]` are allowed there, and they must match up with a corresponding `[:upper:]` or `[:lower:]` in the target string. Everything else gets rejected with a "misaligned" or "invalid class" error.
 
-**Delete + Squeeze (`-d -s`):**
-- Two strings: string1 = delete, string2 = squeeze
-- Any class can be in string2 (since string2 is for squeezing, not translating)
-- `tr -d -s '[:lower:]' '[:upper:]'` → delete lowercase, then squeeze uppercase
-- All classes are ASCII-only in the C locale
+So `tr '[:lower:]' '[:upper:]'` is fine (lowercase → uppercase), but `tr '[:alpha:]' '[:upper:]'` is an error because `[:alpha:]` in string1 doesn't align with `[:upper:]` in string2. Same with `tr 'abc' '[:upper:]'` — literal strings in string1 can't pair with class specifiers in string2.
 
-## Todo
+**Delete (`-d`)** — just one string. Any chars in that set get deleted.
 
-- [ ] `[:upper:]` and `[:lower:]` in string2 should be **case conversion functions**, not literal sets
-  - `tr '[:lower:]' '[:upper:]'` → lowercase chars become uppercase via `unicode.ToUpper`
-  - `tr '[:upper:]' '[:lower:]'` → uppercase chars become lowercase via `unicode.ToLower`
-  - Currently they expand to literal ASCII sets (same as string1)
-- [ ] Add misaligned error: other classes in string2 (`[:digit:]`, `[:alpha:]`, etc.) → error
-- [ ] Add misaligned error: literal target with `[:upper:]`/`[:lower:]` in string2 → error
-- [ ] `[:upper:]`/`[:lower:]` in string2 must match same relative position as counterpart in string1
-  - `tr '[:lower:][:upper:]' '[:upper:][:lower:]'` → swap case (valid)
-  - `tr '[:upper:]' '[:lower:]'` → valid
-  - `tr 'abc' '[:upper:]'` → "misaligned" error
-- [ ] Squeeze (`-s`) — one string only, replaces N consecutive identical chars with 1
-- [ ] Delete + Squeeze (`-d -s`) — two strings: string1 = delete, string2 = squeeze
-- [ ] Track which positions are class specifiers vs literal chars so buildTranslator knows which to treat as functions
+## Differences from real `tr`
+
+- My implementation is ascii only, i think real `tr` is locale aware and supports unicode for things like lower and upper.
+- I support a single class per string, each arg can be one expression. In real `tr` you can combine stuff like `tr '[:lower:][:upper:]' '[:upper:][:lower:]'`.
+- I only support squeeze with one string like `tr -s 'abc'` not translate then squeeze, like `tr -s 'abc' 'xyz'`.
+- I don't provide separate error msg for misalignment and invalid class. Error messages should be:
+  - **Invalid class in string2** (non-upper/lower class like `[:digit:]`, `[:alpha:]`, etc.): `when translating, the only character classes that may appear in string2 are 'upper' and 'lower'`
+  - **Misaligned** (`[:upper:]`/`[:lower:]` in string2 but string1 is literal or different class): `misaligned [:upper:] and/or [:lower:] construct`
+- I also don't support delete + squeeze. This is how this combo should work i think:
+  - Two strings: string1 = delete, string2 = squeeze
+  - Any class can be in string2 (since string2 is for squeezing, not translating)
+  - `tr -d -s '[:lower:]' '[:upper:]'` → delete lowercase, then squeeze uppercase
