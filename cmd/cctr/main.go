@@ -44,6 +44,8 @@ var asciiPrint = []rune(" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTU
 var asciiPunct = []rune("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
 var asciiSpace = []rune("\t\n\v\f\r ") // tab 9, newline 10, vertical tab 11, formfeed 12, carriage return 13, space 32
 
+// exprKind is a label to know what kind of expression we're dealing with.
+// needed to check for allowed expressions in string2/translation
 type exprKind string
 
 const (
@@ -64,22 +66,22 @@ const (
 func main() {
 	err := run(os.Args, os.Stdin, os.Stdout)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "running tr with args %v: %v", os.Args, err)
+		fmt.Fprintf(os.Stderr, "tr: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// run parses flags, builds a translator and translates the input.
+// run parses flags, builds a translator and translates the input. Testable boundary.
 func run(args []string, in io.Reader, out io.Writer) error {
 
 	cfg, err := parseFlags(args[1:])
 	if err != nil {
-		return fmt.Errorf("parsing %v as flags: %v", args[1:], err)
+		return fmt.Errorf("parsing flags: %w", err)
 	}
 
 	tr, err := buildTranslator(cfg)
 	if err != nil {
-		return fmt.Errorf("building translator: %v\n", err)
+		return fmt.Errorf("building translator: %v", err)
 	}
 
 	cfg.in = in
@@ -104,19 +106,29 @@ func parseFlags(args []string) (config, error) {
 	}
 	parsedArgs := fs.Args()
 
+	// tr has 2 modes: 1 string mode with delete or squeeze, 2 string mode without those flags set
 	switch {
-	case len(parsedArgs) == 1 && (cfg.deleteFlag || cfg.squeezeFlag):
+	case cfg.deleteFlag || cfg.squeezeFlag:
 		// if one arg and -d or -s flag, make that arg the target.
-		cfg.target = parsedArgs[0]
+		if len(parsedArgs) == 1 {
+			cfg.target = parsedArgs[0]
+		} else {
+			return config{}, fmt.Errorf("too many args: %q", parsedArgs)
+		}
 	case len(parsedArgs) < 2:
-		// if less that two args and no flags -> error, ask for target + translation, two args
-		return config{}, fmt.Errorf("please provide 'tr <target> <translation>': %v", parsedArgs)
+		// we need two strings (target + translation) bcs neither -d or -s was set
+		return config{}, fmt.Errorf("missing operand after %q", parsedArgs[0])
+	case len(parsedArgs) == 2 && parsedArgs[1] == "":
+		// if two args but last one is empty
+		return config{}, fmt.Errorf("string2 must be non-empty")
 	case len(parsedArgs) == 2:
 		// two args: first is target, second is translation
 		cfg.target = parsedArgs[0]
 		cfg.translation = parsedArgs[1]
+	case len(parsedArgs) > 2:
+		return config{}, fmt.Errorf("extra operand(s): %q", parsedArgs[2:])
 	default:
-		return config{}, fmt.Errorf("please provide cmd <target> <translation>: %v", parsedArgs)
+		return config{}, fmt.Errorf("unknown operand configuration: %q", parsedArgs)
 	}
 
 	// if -d and -s, error, can't combine those
@@ -159,7 +171,7 @@ func expandExpression(s string) ([]rune, exprKind, error) {
 	}
 
 	// Handle range expression
-	// simplified for now, only support one - in range
+	// simplified for now, only support one '-' in range
 	parts := strings.Split(s, "-")
 	// If there's something before and after the - we treat it as real range
 	if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
@@ -200,12 +212,18 @@ func buildTranslator(cfg config) (func(rune) rune, error) {
 	var translationExprKind exprKind
 
 	if cfg.deleteFlag {
+		// for delete mode use -1 as sentinel value meaning "delete this"
 		translation = []rune{-1}
 		translationExprKind = exprDelete
 	} else if cfg.squeezeFlag {
+		// for squeeze mode use -2 as sentinel value meaning "squeeze this"
 		translation = []rune{-2}
 		translationExprKind = exprSqueeze
 	} else {
+		if cfg.translation == "" {
+			return nil, fmt.Errorf("empty string2")
+
+		}
 		translation, translationExprKind, err = expandExpression(cfg.translation)
 		if err != nil {
 			return nil, fmt.Errorf("expanding translation expression %q: %w", cfg.translation, err)
@@ -222,6 +240,8 @@ func buildTranslator(cfg config) (func(rune) rune, error) {
 		return nil, fmt.Errorf("expanding translation: %w", err)
 	}
 
+	// Build the mapping, for each char in target, map to corresponding char in translation.
+	// If len(target) > len(translation) just repeat last char of translation
 	trMap := make(map[rune]rune)
 
 	for i, r := range target {
@@ -231,6 +251,8 @@ func buildTranslator(cfg config) (func(rune) rune, error) {
 			trMap[r] = translation[len(translation)-1]
 		}
 	}
+	// return a closure that looks up translation in the map.
+	// if it's not there, return original r unchanged
 	return func(r rune) rune {
 		if val, exists := trMap[r]; exists {
 			return val
@@ -266,6 +288,10 @@ func (cfg *config) translate(tr func(rune) rune) error {
 
 	var prevRune rune
 
+	// read one rune at a time, look it up in translator map
+	// if it's a squeeze: -2 decide wether to skip it
+	// if its a delete -1 just skip it
+	// otherwise translate
 	for {
 		r, _, err := reader.ReadRune()
 		if err == io.EOF {
@@ -279,6 +305,7 @@ func (cfg *config) translate(tr func(rune) rune) error {
 		// if translated is -2 that means r shoudl be squeezed
 		if translated == -2 {
 			// if r is same as prevRune squeeze it by marking it as -1 for delete
+			// compare against original rune bcs in the map theres a sentinel val -2
 			if r == prevRune {
 				translated = -1
 				// if this is the first occurence, print the original rune
